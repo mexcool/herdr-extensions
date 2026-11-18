@@ -9,7 +9,7 @@ Herdr's own `main` layout, unchanged except for its status bar. The single `work
 - Everything above the status bar is Herdr's `main` as of 0.1.16: the sidebar with spaces and agents, tabs, and the pane area with the files and changes panel.
 - The 28px status bar, left to right:
   - `workspace-status` (weight 1): the shipped block, taking the free width.
-  - `ai-usage` (360px): `claude 5h 72% 7d 64% Opus 80%  codex 5h 90% 7d 81%`.
+  - `ai-usage` (440px): `claude 5h 72% 7d 64% Opus 80%  codex 5h 90% 7d 81%`.
   - `pod-stats` (300px): `cpu 1.5/8 mem 6.2/16G disk 40/100G`.
 - In a space on a machine without cgroup v2 (macOS), `pod-stats` is empty. In one without signed-in agents, `ai-usage` is empty.
 
@@ -23,7 +23,7 @@ Herdr's own `main` layout, unchanged except for its status bar. The single `work
   ```json
   { "id": "status-row", "type": "row", "size": { "px": 28 }, "resizable": false, "children": [
     { "id": "status", "type": "block", "size": { "weight": 1 }, "content": { "mod": "workspace-status" } },
-    { "id": "ai-usage", "type": "block", "size": { "px": 360 }, "content": { "mod": "ai-usage" } },
+    { "id": "ai-usage", "type": "block", "size": { "px": 440 }, "content": { "mod": "ai-usage" } },
     { "id": "pod-stats", "type": "block", "size": { "px": 300 }, "content": { "mod": "pod-stats" } } ] }
   ```
 - The mods it needs are `../ai-usage/mods/ai-usage` and `../pod-stats/mods/pod-stats` in this repo. Copy both into `mods/`.
@@ -31,7 +31,7 @@ Herdr's own `main` layout, unchanged except for its status bar. The single `work
 ## Watch out
 
 - Clones don't follow Herdr's updates to `main`. On a release that changes `main`, clone it again (`layout.clone {"name": "main", "as": "main-stats"}`, after moving this one aside) and redo the status row.
-- The two fixed widths (660px together) suit a full-width window. In a narrow one, `workspace-status` gets what is left.
+- The two fixed widths (740px together) suit a full-width window. In a narrow one, `workspace-status` gets what is left.
 
 ## Done when
 

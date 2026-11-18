@@ -6,7 +6,7 @@ A status-bar block with how much of each Claude and Codex plan window is left, f
 
 ## What you see
 
-- A 28px block on the `chrome` background with a 1px `border` line on top, sized to sit in a status row. 360px fits Claude's three windows and Codex's two.
+- A 28px block on the `chrome` background with a 1px `border` line on top, sized to sit in a status row. 440px fits Claude's three windows and Codex's two at their widest: every window at 100% and a six-letter model name take about 395px of text.
 - Right-aligned, 14px side padding, text 11.8px: `claude  5h 72%  7d 64%  Opus 80%    codex  5h 90%  7d 81%`. The account names and window labels are `dim`. Each percentage is what is left of that window (100% = unused): `foreground`, `ansi3` (amber) at 25% or less, `ansi1` (red) at 10% or less.
 - Claude's windows: `5h` (session), `7d` (weekly, all models), and a weekly window scoped to one model, labeled with the model's name, when the plan has one. Codex's: its primary and secondary windows, labeled by length (`5h`, `7d`).
 - Hovering an account shows when each window resets: `claude: % of each window left · 5h resets in 2h 10m · 7d resets in 3d 5h · …`.
@@ -29,7 +29,7 @@ A status-bar block with how much of each Claude and Codex plan window is left, f
 - `mods/ai-usage/main.js`: a `View` with `init`, `tick` and `render`. It uses `exec("sh", ["-c", PROBE], { on, timeout: 30000 })` on the active space's machine, `theme()` tokens `chrome`, `border`, `dim`, `foreground`, `ansi3`, `ansi1`, `.tooltip`, `cx.timer.every`, `cx.spawn`, `cx.notify` and `checking()`.
 - In a layout, a block in a 28px status row:
   ```json
-  { "id": "ai-usage", "type": "block", "size": { "px": 360 }, "content": { "mod": "ai-usage" } }
+  { "id": "ai-usage", "type": "block", "size": { "px": 440 }, "content": { "mod": "ai-usage" } }
   ```
 - It runs `sh`, `sed`, `curl`, `codex`, `mktemp`, `sleep`, `touch` and, on macOS, `security`. It reads Claude Code's credentials and reaches `api.anthropic.com`, and Codex reaches its own servers.
 

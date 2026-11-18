@@ -193,7 +193,7 @@
               "id": "ai-usage",
               "type": "block",
               "size": {
-                "px": 360
+                "px": 440
               },
               "content": {
                 "mod": "ai-usage"
