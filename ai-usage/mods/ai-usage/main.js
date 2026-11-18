@@ -1,7 +1,7 @@
 import { View, div } from "gpui-kit";
 import { HoverCard, h_flex, v_flex } from "gpui-base";
 import { exec, theme, checking, props, run, shared, setShared } from "herdr";
-import { PROBE, parse, merge, level, elapsed, pace, nextMonth, money, until, clock, date, ago } from "./probe.js";
+import { PROBE, parse, merge, level, elapsed, pace, countdown, nextMonth, money, until, clock, date, ago } from "./probe.js";
 
 // The tick bars and the hover panel follow nozikov/herdr-usage-limits (MIT); the
 // data sources follow steipete/CodexBar.
@@ -94,7 +94,7 @@ export default class AiUsage extends View {
   }
 
   // The status-bar row. Per account: its name; per window its label, bar with
-  // tick, percent used and, once amber or red, the time to reset; then Claude's
+  // tick, percent left and, when `countdown` says so, the time to reset; then Claude's
   // `+$X` extra usage this month. A stale account is dimmed, one waiting for its
   // first answer shows "…", an unreadable one "!".
   summary(r, now, t) {
@@ -103,7 +103,7 @@ export default class AiUsage extends View {
         .child(div().text_size(10.5).child(w.label))
         .child(windowBar(24, w, now, t))
         .child(div().text_color(tinted(w.used, t)).child(`${Math.round(100 - w.used)}%`))
-        .when(level(w.used) !== "ok", (s) => s.child(div().child(until(w.resets, now))));
+        .when(countdown(w, now), (s) => s.child(div().child(until(w.resets, now))));
     const group = (key) => {
       const a = r[key];
       const g = h_flex().gap(8).items_center().flex_none().opacity(a.stale ? STALE : 1).child(key);
