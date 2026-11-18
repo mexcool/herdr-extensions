@@ -21,8 +21,8 @@ Without a label it still names a tab nobody named: after the title of its first 
 - Each second it reads `terminals()` and `panes()`. For every terminal with a `tab.name` label whose value it hasn't given yet, it runs `tab.rename {id, name}` on the tab whose pane shows that terminal.
 - Once per value: it keeps the value it gave per terminal address in shared state (`tab-names`), so a rename made later in the app stays. Setting a new value renames the tab again.
 - A labelled terminal without a pane yet (a sub-agent, a terminal still being adopted) is tried again on the next tick. A sub-agent's label never names its parent's tab.
-- The title fallback: for each tab, the first pane whose program reports itself as an agent (`app`). It renames a tab only if nobody named it, or if this mod named it from that pane's previous title, so a later `/rename` follows and a hand rename stays. A labelled tab never takes a title. Shell-only tabs keep their number.
-- It forgets a terminal once its machine is ready and the terminal is gone. A machine that's offline keeps its entries, so its labels don't rename again when it comes back.
+- The title fallback: for each tab, the first pane running an agent now (`program.agent`, not `app`, which keeps an agent's last report after it exits). It takes only a title the tab bar would show (the tabs mod's `clean` and checks: not a path, a `user@host`, the terminal's address or the program's name), so a shell's title never names a tab. It renames a tab only if nobody named it, or if this mod named it from that pane's previous title, so a later `/rename` follows and a hand rename stays. A labelled tab never takes a title. Shell-only tabs keep their number.
+- It remembers what it gave a terminal while that terminal lives, so an agent quit and started again in the same tab renames it again. It forgets a terminal once its machine is ready and the terminal is gone. A machine that's offline keeps its entries, so its labels don't rename again when it comes back.
 - No clicks, keys or hovers. It runs nothing and reads no files.
 
 ## Built from
@@ -46,3 +46,4 @@ Without a label it still names a tab nobody named: after the title of its first 
 - `hc label <terminal> tab.name=probe` renames that terminal's tab to `probe`, for a terminal on this computer and for one on another machine labelled there.
 - After `tab.rename` by hand, the tab keeps that name; `hc label <terminal> tab.name=probe-2` then renames it to `probe-2`.
 - A new tab with `claude -n probe-3` in it is named `probe-3`, and `/rename probe-4` there renames it. A tab renamed by hand keeps its name through a later `/rename`.
+- Quitting that agent leaves the tab named `probe-4`, not the shell's title. `claude -n probe-5` in the same tab then renames it.

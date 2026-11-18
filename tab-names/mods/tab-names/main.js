@@ -11,6 +11,20 @@ const KEY = "tab-names"; // shared: { <terminal address>: <name it was given> }
 
 const machineOf = (address) => (address.includes("/") ? address.split("/")[0] : "");
 
+// Same as Herdr's tab bar (the tabs mod): drops a status glyph, keeps a leading bracket or quote.
+const clean = (s) => (s ?? "").replace(/^[^\p{L}\p{N}\p{Ps}\p{Pi}]+/u, "").replace(/^\[ [!.] \] /, "").trim();
+
+// The title the tab bar shows over an unnamed tab, or null: an agent running now, under
+// its own title, not a shell's user@host:path or the program's name. Codex appends " | <worktree>".
+function agentTitle(p) {
+  if (!p.program?.agent) return null;
+  const raw = (p.title ?? "").split(" | ")[0];
+  const live = clean(raw);
+  const path = /^[~/]|^[A-Za-z]:\\/.test(raw.replace(/^[^\p{L}\p{N}~/]+/u, ""));
+  const telling = live && live !== p.terminal && live !== p.program.name && !path && !live.includes("@") && live.toLowerCase() !== p.program.key;
+  return telling ? live : null;
+}
+
 export default class TabNames extends View {
   init(_props, cx) {
     if (checking()) return;
@@ -22,10 +36,12 @@ export default class TabNames extends View {
     const given = shared(KEY) ?? {};
     const shown = panes().filter((p) => p.terminal);
     const tabOf = new Map(shown.map((p) => [p.terminal, p.tab]));
-    // Keep what was given on machines whose terminals aren't known right now (offline),
-    // so their labels don't rename again when they come back.
+    // Keep what was given while its terminal lives (an agent quit and started again in it
+    // still counts as named here), and on machines whose terminals aren't known right now
+    // (offline), so their labels don't rename again when they come back.
     const ready = new Set(machines().filter((m) => m.layout === "ready").map((m) => m.name ?? ""));
-    const next = Object.fromEntries(Object.entries(given).filter(([a]) => !ready.has(machineOf(a))));
+    const live = new Set(terminals().map((t) => t.address));
+    const next = Object.fromEntries(Object.entries(given).filter(([a]) => live.has(a) || !ready.has(machineOf(a))));
     const labelled = new Set(); // tabs a label names
     for (const t of terminals()) {
       const name = t.labels?.[LABEL];
@@ -39,14 +55,14 @@ export default class TabNames extends View {
       next[t.address] = name;
     }
     // The title fallback: only a tab nobody named, or one this mod named from that
-    // pane's previous title, so a hand rename stays. Codex appends " | <worktree>".
+    // pane's previous title, so a hand rename stays.
     const tabs = new Map(spaces().flatMap((s) => s.tabs).map((tab) => [tab.id, tab]));
     const titled = new Set();
     for (const p of shown) {
-      if (!p.app || titled.has(p.tab)) continue;
+      if (!p.program?.agent || titled.has(p.tab)) continue;
       titled.add(p.tab);
       const tab = tabs.get(p.tab);
-      const name = p.title?.split(" | ")[0].trim();
+      const name = agentTitle(p);
       if (labelled.has(p.tab) || !tab || !name) continue;
       const mine = given[p.terminal];
       if (mine !== name && (!tab.named || tab.name === mine)) run("tab.rename", { id: p.tab, name });
