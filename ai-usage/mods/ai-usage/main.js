@@ -1,6 +1,6 @@
 import { View, div } from "gpui-kit";
 import { HoverCard, h_flex, v_flex } from "gpui-base";
-import { exec, spaces, theme, checking, props, run } from "herdr";
+import { exec, theme, checking, props, run, shared, setShared } from "herdr";
 import { PROBE, parse, merge, level, elapsed, pace, nextMonth, money, until, clock, date, ago } from "./probe.js";
 
 // The tick bars and the hover panel follow nozikov/herdr-usage-limits (MIT); the
@@ -16,8 +16,6 @@ const ACCOUNTS = {
   codex: { name: "Codex", dashboard: "https://chatgpt.com/codex/cloud/settings/analytics#usage" },
 };
 const STALE = 0.55;
-
-const activeMachine = () => spaces().find((s) => s.active)?.machine ?? null;
 
 const levelColor = (lv, t) => (lv === "hot" ? t.ansi1 : lv === "warn" ? t.ansi3 : t.ansi2);
 
@@ -36,15 +34,16 @@ const windowBar = (width, w, now, t) => bar(width, 100 - w.used, w.used, 1 - ela
 
 const tinted = (used, t) => (level(used) === "ok" ? t.foreground : levelColor(level(used), t));
 
+// Every copy of the mod, in every window, shares one state (persisted by Herdr):
+// { reading, due, wait, probing }. One probe at a time, claimed until `probing`;
+// a new copy (a reload, a layout switch) shows the last reading at once and
+// doesn't probe before `due`.
+const KEY = "ai-usage";
+const CLAIM = 70 * 1000; // longer than a probe's 60s timeout
+const state = () => shared(KEY) ?? {};
+
 export default class AiUsage extends View {
   init(_props, cx) {
-    // The last reading and the next probe per machine (null: this computer), so a
-    // space switch shows that machine's accounts at once, and probes only a
-    // machine not read for EVERY.
-    this.readings = new Map();
-    this.due = new Map();
-    this.wait = new Map(); // the current 429 backoff per machine
-    this.busy = false;
     this.minute = 0;
     if (checking()) return;
     cx.timer.every(1000, (cx) => this.tick(cx));
@@ -53,16 +52,19 @@ export default class AiUsage extends View {
 
   tick(cx) {
     // Redraw once a minute, so ticks, countdowns and ages move between probes.
-    const minute = Math.floor(Date.now() / 60000);
+    const now = Date.now();
+    const minute = Math.floor(now / 60000);
     if (minute !== this.minute) {
       this.minute = minute;
       cx.notify();
     }
-    const on = activeMachine();
-    if (this.busy || Date.now() < (this.due.get(on) ?? 0)) return;
-    this.busy = true;
-    cx.notify(); // the refresh button shows it
-    cx.spawn(async (cx) => {
+    const s = state();
+    if (now < (s.due ?? 0) || now < (s.probing ?? 0)) return;
+    setShared(KEY, { ...s, probing: now + CLAIM });
+    // The accounts are the same everywhere, so one machine is read: this computer,
+    // or the one the `machine` prop names.
+    const on = props()?.machine ?? null;
+    cx.spawn(async () => {
       let next = null;
       try {
         const r = await exec("sh", ["-c", PROBE], { on, timeout: 60000 });
@@ -70,23 +72,24 @@ export default class AiUsage extends View {
       } catch (_e) {
         // The machine is unreachable: the last reading stays, marked stale.
       }
-      const now = Date.now();
-      const reading = merge(this.readings.get(on), next, now);
-      if (reading.claude || reading.codex) this.readings.set(on, reading);
-      else this.readings.delete(on);
+      const done = Date.now();
+      const last = state();
+      const reading = merge(last.reading, next, done);
       const accounts = [reading.claude, reading.codex];
       const limited = accounts.some((p) => p?.stale === "429" || p?.pending === "429");
-      const wait = limited ? Math.min(MAX_WAIT, (this.wait.get(on) ?? EVERY / 2) * 2) : null;
-      this.wait.set(on, wait);
-      const fresh = accounts.some((p) => p?.at === now);
-      this.due.set(on, now + (wait ?? (fresh ? EVERY : RETRY)));
-      this.busy = false;
-      cx.notify();
+      const wait = limited ? Math.min(MAX_WAIT, (last.wait ?? EVERY / 2) * 2) : null;
+      const fresh = accounts.some((p) => p?.at === done);
+      setShared(KEY, {
+        reading: reading.claude || reading.codex ? reading : null,
+        due: done + (wait ?? (fresh ? EVERY : RETRY)),
+        wait,
+        probing: 0,
+      });
     });
   }
 
   refresh(cx) {
-    this.due.set(activeMachine(), 0);
+    setShared(KEY, { ...state(), due: 0 });
     this.tick(cx);
   }
 
@@ -146,7 +149,7 @@ export default class AiUsage extends View {
       const s = v_flex().gap(6).child(header(key, a));
       if (a.error) return s.child(div().text_size(11).text_color(t.ansi1).child("! Couldn't read its usage"));
       const reason = (code) => (code === "offline" ? "machine unreachable" : code === "000" ? "no network" : code === "429" ? "rate-limited (HTTP 429)" : `HTTP ${code}`);
-      if (a.pending) return s.child(small(`${reason(a.pending)}, retrying in ${until(this.due.get(activeMachine()) ?? now, now)}`));
+      if (a.pending) return s.child(small(`${reason(a.pending)}, retrying in ${until(state().due ?? now, now)}`));
       const why = a.stale === "offline" ? reason(a.stale) : `couldn't refresh: ${reason(a.stale)}`;
       s.child(small(`via ${a.via === "api" ? "API" : "CLI"} · updated ${ago(a.at, now)}${a.stale ? ` · ${why}` : ""}`));
       s.child(v_flex().gap(6).opacity(a.stale ? STALE : 1).children(a.windows.map(windowLine(key))));
@@ -165,6 +168,7 @@ export default class AiUsage extends View {
       return s;
     };
     const rule = () => div().h(1).bg(t.border).flex_none();
+    const busy = now < (state().probing ?? 0);
     const body = v_flex().id("ai-usage-panel-body").w(460).p(12).gap(10).rounded(8).border(1).border_color(t.border)
       .bg(t.popover).shadow_lg().text_size(12).text_color(t.foreground);
     ["claude", "codex"].filter((key) => r[key]).forEach((key, i) => {
@@ -173,9 +177,9 @@ export default class AiUsage extends View {
     });
     return body.child(rule()).child(
       h_flex().justify_end().child(
-        div().id("ai-usage-refresh").px(8).py(2).rounded(4).text_size(11).text_color(this.busy ? t.dim : t.muted)
-          .when(!this.busy, (b) => b.cursor_pointer().hover((s) => s.bg(t.hover)).on_click((_e, cx) => this.refresh(cx)))
-          .child(this.busy ? "↻ Refreshing…" : "↻ Refresh")));
+        div().id("ai-usage-refresh").px(8).py(2).rounded(4).text_size(11).text_color(busy ? t.dim : t.muted)
+          .when(!busy, (b) => b.cursor_pointer().hover((s) => s.bg(t.hover)).on_click((_e, cx) => this.refresh(cx)))
+          .child(busy ? "↻ Refreshing…" : "↻ Refresh")));
   }
 
   // With a `fit` prop naming this block's id in the layout, the block takes the
@@ -194,14 +198,12 @@ export default class AiUsage extends View {
     const now = Date.now();
     const root = h_flex().size_full().items_center().justify_end().overflow_hidden()
       .bg(t.chrome).border_t(1).border_color(t.border).text_size(11.8).text_color(t.dim);
-    // Measured at its own width, even when the block is narrower. A 1×14px divider
-    // leads it, setting it apart from the block on its left.
-    const content = h_flex().id("ai-usage-content").flex_none().gap(14).items_center()
+    // Measured at its own width, even when the block is narrower.
+    const content = h_flex().id("ai-usage-content").flex_none().items_center()
       .on_size_change((size) => this.fit(size.width));
-    const r = this.readings.get(activeMachine());
+    const r = state().reading;
     if (!r) return root.child(content);
-    return root.child(content.pr(14)
-      .child(div().w(1).h(14).bg(t.border).flex_none())
+    return root.child(content.px(14)
       .child(HoverCard.new("ai-usage-panel").anchor("bottom_right").open_delay(350).close_delay(300)
         .trigger(this.summary(r, now, t))
         .content(this.details(r, now, t))));

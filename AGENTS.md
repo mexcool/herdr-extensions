@@ -21,7 +21,8 @@ A layout uses the mods of the sibling folders and doesn't copy them; its recipe 
 
 - Self-contained: a mod folder gets copied alone into `mods/`, so it imports only `gpui-kit`, `gpui-base`, `herdr` and its own files.
 - `probe.js` holds what runs on a machine (`PROBE`, a sh script) and the pure functions that read its output. It imports nothing from Herdr, so Node can run it. `main.js` is the view.
-- Follow the active space's machine (`spaces().find(s => s.active)?.machine`, `null` for this computer). Keep the last reading per machine and show the active one's, so a switch is instant and never shows another machine's numbers.
+- A mod about a machine follows the active space's machine (`spaces().find(s => s.active)?.machine`, `null` for this computer) and shows that machine's reading, so a switch never shows another machine's numbers. A mod about something that is the same everywhere (accounts) reads one machine.
+- Keep readings and schedules in Herdr's shared state (`shared`/`setShared`, keyed by the mod's name), not on the instance. Every copy in every window then shows the same reading, a reload or layout switch doesn't start blank or probe again, and a claim (`probing: <until>`) set before a probe keeps it to one at a time.
 - No timers or `exec` while `checking()` is true (`herdr-app check`).
 - Theme tokens only (`chrome`, `border`, `dim`, `foreground`, `ansi3` amber, `ansi1` red), so they suit any theme.
 - Status-bar mods are `place: none` blocks for a 28px row: `chrome` background, 1px `border` on top, 14px side padding, 11.8px text, label `dim`.

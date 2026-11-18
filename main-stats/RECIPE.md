@@ -10,7 +10,7 @@ Herdr's own `main` layout, unchanged except for its status bar. The single `work
 - The 28px status bar, left to right:
   - `space-status` (weight 1): machine, branch and agent count, taking the free width.
   - `pod-stats`, as wide as its content: `cpu 1.5/8 mem 6.2/16G disk 40/100G`.
-  - a 1×14px divider, then `ai-usage`, as wide as its content: `claude 5h ▬ 59% 7d ▬ 36% Opus ▬ 20% 1d 4h  codex 5h ▬ 88% 7d ▬ 70%`.
+  - a 1×14px divider, drawn by pod-stats while it has numbers (so none in a macOS space), then `ai-usage`, as wide as its content, with the same reading in every space: `claude 5h ▬ 59% 7d ▬ 36% Opus ▬ 20% 1d 4h  codex 5h ▬ 88% 7d ▬ 70%`.
 - In a space on a machine without cgroup v2 (macOS), `pod-stats` is empty. In one without signed-in agents, `ai-usage` is empty.
 
 ## How it behaves
@@ -23,7 +23,7 @@ Herdr's own `main` layout, unchanged except for its status bar. The single `work
   ```json
   { "id": "status-row", "type": "row", "size": { "px": 28 }, "resizable": false, "children": [
     { "id": "status", "type": "block", "size": { "weight": 1 }, "content": { "mod": "space-status" } },
-    { "id": "pod-stats", "type": "block", "size": { "px": 270 }, "content": { "mod": "pod-stats", "props": { "fit": "pod-stats" } } },
+    { "id": "pod-stats", "type": "block", "size": { "px": 270 }, "content": { "mod": "pod-stats", "props": { "fit": "pod-stats", "divider": true } } },
     { "id": "ai-usage", "type": "block", "size": { "px": 560 }, "content": { "mod": "ai-usage", "props": { "fit": "ai-usage" } } } ] }
   ```
 - The mods it needs are `../space-status/mods/space-status`, `../pod-stats/mods/pod-stats` and `../ai-usage/mods/ai-usage` in this repo. Copy all three into `mods/`.

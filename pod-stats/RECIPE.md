@@ -15,20 +15,21 @@ A status-bar block with the CPU, memory and disk of the active space's machine, 
 ## How it behaves
 
 - Agent statuses play no part; it shows the machine only. No clicks, keys or hovers.
-- A cheap 250ms timer compares the active space's machine with the one probed last. A probe runs when they differ, or when the last probe is 5s old. One probe at a time; a switch made during a probe is picked up as soon as it returns.
-- The last reading of every machine is kept, so a space switch draws that machine's last numbers at once, then refreshes them. It never shows one machine's numbers under another's space.
+- Every copy of the mod, in every window, shares the readings through Herdr's shared state, `shared("pod-stats")`: `{ [machine]: { reading, due, probing } }`, with `""` for this computer. So every space on a machine shows that machine's numbers, a space switch draws its last numbers at once, and a reload, a layout switch or a second window doesn't start blank. It never shows one machine's numbers under another's space.
+- A cheap 250ms timer in each copy checks whether the active space's machine is due: never read, or read 5s ago. A copy claims a machine's probe in the shared state (`probing`, 10s) before it starts, so each machine has one probe at a time.
 - CPU comes from two readings of the `cpu.stat` counter. If the previous reading of that machine is under 15s old, cpu is the cores used between the two. Otherwise the last cpu value stays and the next probe comes 1s later instead of 5s.
 
 ## Built from
 
 - `mods/pod-stats/mod.json`: `place: none`, title "Pod stats". It draws only where a layout puts it.
 - `mods/pod-stats/probe.js`: `PROBE`, a `set -e` sh script run in `/sys/fs/cgroup` that prints raw values: `usage_usec` from `cpu.stat`, `cpu.max`, `nproc`, `memory.current`, `memory.max`, `active_file` and `inactive_file` from `memory.stat`, and `df -Pk "$HOME"`. `parse` turns them into numbers (all arithmetic is in JS, so no awk float formatting); `coresBetween` divides the `usage_usec` delta by the wall time.
-- `mods/pod-stats/main.js`: a `View` with `init`, `tick`, `fit` and `render`. It uses `exec("sh", ["-c", PROBE], { on, timeout: 5000 })` on the active space's machine (`spaces().find(s => s.active)?.machine`), `theme()` tokens `chrome`, `border`, `dim`, `foreground`, `ansi3`, `ansi1`, `cx.timer.every`, `cx.spawn`, `cx.notify`, `checking()` (no timers while `herdr-app check` runs), `props()` and `run()`.
+- `mods/pod-stats/main.js`: a `View` with `init`, `tick`, `fit` and `render`. It uses `exec("sh", ["-c", PROBE], { on, timeout: 5000 })` on the active space's machine (`spaces().find(s => s.active)?.machine`), `theme()` tokens `chrome`, `border`, `dim`, `foreground`, `ansi3`, `ansi1`, `cx.timer.every`, `cx.spawn`, `cx.notify`, `checking()` (no timers while `herdr-app check` runs), `shared` and `setShared`, `props()` and `run()`.
   The block sizes itself to that content when the layout passes its block id as the `fit` prop: the content row reports its own width with `on_size_change`, and the mod sends `run("layout.resize", { id, px })` when it changes, 0px when there's nothing to show.
 - In a layout, a block in a 28px status row:
   ```json
-  { "id": "pod-stats", "type": "block", "size": { "px": 270 }, "content": { "mod": "pod-stats", "props": { "fit": "pod-stats" } } }
+  { "id": "pod-stats", "type": "block", "size": { "px": 270 }, "content": { "mod": "pod-stats", "props": { "fit": "pod-stats", "divider": true } } }
   ```
+  With `"divider": true`, a 1×14px `border` divider closes its content on the right, 14px after the last item and in place of the right padding, setting it apart from the block after it. It is drawn only while there are numbers, so it goes with them.
 - It runs `sh`, `grep`, `cat`, `nproc`, `df` and `tail` on the machine, reads `/sys/fs/cgroup`, and reaches no network.
 
 ## Watch out

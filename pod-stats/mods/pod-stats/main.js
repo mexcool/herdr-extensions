@@ -1,33 +1,39 @@
 import { View, div } from "gpui-kit";
 import { h_flex } from "gpui-base";
-import { exec, spaces, theme, checking, props, run } from "herdr";
+import { exec, spaces, theme, checking, props, run, shared, setShared } from "herdr";
 import { PROBE, parse, coresBetween } from "./probe.js";
 
 const EVERY = 5000;
 
 const activeMachine = () => spaces().find((s) => s.active)?.machine ?? null;
 
+// Every copy of the mod, in every window, shares the readings (persisted by
+// Herdr): { [machine]: { reading, due, probing } }, "" for this computer. Each
+// machine is probed by one copy at a time, claimed until `probing`, and a new copy
+// (a reload, a layout switch) shows its last numbers at once.
+const KEY = "pod-stats";
+const CLAIM = 10 * 1000; // longer than a probe's 5s timeout
+const keyOf = (machine) => machine ?? "";
+const machines = () => shared(KEY) ?? {};
+
 export default class PodStats extends View {
   init(_props, cx) {
-    // The last reading per machine (null: this computer), so a space switch shows
-    // that machine's numbers at once and never another machine's.
-    this.readings = new Map();
-    this.busy = false;
-    this.probed = undefined; // the machine of the latest probe
-    this.due = 0;
     if (checking()) return;
-    // Cheap: reads the app's own state. A probe only runs when one is due or the
-    // active space is on another machine than the latest probe.
+    // Cheap: reads the app's own state. A probe runs only when the active space's
+    // machine is due: a switch to a machine not read for EVERY probes at once.
     cx.timer.every(250, (cx) => this.tick(cx));
     this.tick(cx);
   }
 
   tick(cx) {
     const on = activeMachine();
-    if (this.busy || (on === this.probed && Date.now() < this.due)) return;
-    this.busy = true;
-    this.probed = on;
-    cx.spawn(async (cx) => {
+    const key = keyOf(on);
+    const now = Date.now();
+    const all = machines();
+    const m = all[key] ?? {};
+    if (now < (m.due ?? 0) || now < (m.probing ?? 0)) return;
+    setShared(KEY, { ...all, [key]: { ...m, probing: now + CLAIM } });
+    cx.spawn(async () => {
       let next = null;
       try {
         const r = await exec("sh", ["-c", PROBE], { on, timeout: 5000 });
@@ -36,16 +42,13 @@ export default class PodStats extends View {
       } catch (_e) {
         // The machine is unreachable: show nothing.
       }
-      const prev = this.readings.get(on);
+      const latest = machines();
+      const prev = latest[key]?.reading;
       // CPU needs a recent earlier reading. Without one, keep the last value and
       // take the second reading in a second instead of in EVERY.
       const recent = next && prev && next.at - prev.at < 3 * EVERY;
       if (next) next.cpu = recent ? coresBetween(prev, next) : (prev?.cpu ?? null);
-      if (next) this.readings.set(on, next);
-      else this.readings.delete(on);
-      this.busy = false;
-      this.due = Date.now() + (next && !recent ? 1000 : EVERY);
-      cx.notify();
+      setShared(KEY, { ...latest, [key]: { reading: next, due: Date.now() + (next && !recent ? 1000 : EVERY), probing: 0 } });
     });
   }
 
@@ -65,10 +68,12 @@ export default class PodStats extends View {
     const root = h_flex().size_full().items_center().justify_end().overflow_hidden()
       .bg(t.chrome).border_t(1).border_color(t.border).text_size(11.8).text_color(t.dim);
     // Measured at its own width, even when the block is narrower.
-    const bar = h_flex().id("pod-stats-content").flex_none().gap(16).items_center()
+    const bar = h_flex().id("pod-stats-content").flex_none().gap(14).items_center()
       .on_size_change((size) => this.fit(size.width));
-    const s = this.readings.get(activeMachine());
+    const s = machines()[keyOf(activeMachine())]?.reading;
     if (!s) return root.child(bar);
+    // With the `divider` prop, a 1×14px divider closes it on the right, setting it
+    // apart from the block after it. Only while it shows something.
     const item = (label, used, limit, text) => {
       const share = used / limit;
       const color = share >= 0.9 ? t.ansi1 : share >= 0.75 ? t.ansi3 : t.foreground;
@@ -76,9 +81,12 @@ export default class PodStats extends View {
     };
     const cores = `/${+s.cores.toFixed(2)}`;
     const memMax = Number.isFinite(s.memMax) ? `/${s.memMax.toFixed(0)}` : "";
-    return root.child(bar.px(14)
-      .child(s.cpu === null ? item("cpu", 0, 1, `–${cores}`) : item("cpu", s.cpu, s.cores, `${s.cpu.toFixed(1)}${cores}`))
-      .child(item("mem", s.mem, s.memMax, `${s.mem.toFixed(1)}${memMax}G`))
-      .child(item("disk", s.disk, s.diskMax, `${s.disk.toFixed(0)}/${s.diskMax.toFixed(0)}G`)));
+    const divider = Boolean(props()?.divider);
+    return root.child(bar.pl(14).when(!divider, (b) => b.pr(14))
+      .child(h_flex().gap(16).items_center()
+        .child(s.cpu === null ? item("cpu", 0, 1, `–${cores}`) : item("cpu", s.cpu, s.cores, `${s.cpu.toFixed(1)}${cores}`))
+        .child(item("mem", s.mem, s.memMax, `${s.mem.toFixed(1)}${memMax}G`))
+        .child(item("disk", s.disk, s.diskMax, `${s.disk.toFixed(0)}/${s.diskMax.toFixed(0)}G`)))
+      .when(divider, (b) => b.child(div().w(1).h(14).bg(t.border).flex_none())));
   }
 }

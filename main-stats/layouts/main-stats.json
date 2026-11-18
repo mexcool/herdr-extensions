@@ -198,7 +198,8 @@
               "content": {
                 "mod": "pod-stats",
                 "props": {
-                  "fit": "pod-stats"
+                  "fit": "pod-stats",
+                  "divider": true
                 }
               }
             },
