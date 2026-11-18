@@ -5,7 +5,7 @@ Mods and layouts for the [Herdr app](https://herdr.dev), the desktop client of h
 | Extension | Kind | What it shows |
 |---|---|---|
 | [`pod-stats`](pod-stats) | mod | CPU, memory and disk of the active space's machine against its own cgroup limits, so a container shows its limits rather than the node's |
-| [`ai-usage`](ai-usage) | mod | Each Claude and Codex plan window on the active space's machine as a bar with a pace tick, saved resets and extra spend, and a hover panel with reset times, credits and dashboard links. Thanks to [nozikov/herdr-usage-limits](https://github.com/nozikov/herdr-usage-limits) for the tick bars and hover panel this follows, and [steipete/CodexBar](https://github.com/steipete/CodexBar) for the data sources |
+| [`ai-usage`](ai-usage) | mod | Each Claude and Codex plan window on the active space's machine as a bar with a pace tick and extra spend, and a hover panel with reset times, saved resets, credits and dashboard links. Thanks to [nozikov/herdr-usage-limits](https://github.com/nozikov/herdr-usage-limits) for the tick bars and hover panel this follows, and [steipete/CodexBar](https://github.com/steipete/CodexBar) for the data sources |
 | [`space-status`](space-status) | mod | Herdr's `workspace-status` (machine, branch, agents) without its command-palette hint |
 | [`main-stats`](main-stats) | layout | Herdr's `main` with `space-status`, `pod-stats` and `ai-usage` in its status bar |
 

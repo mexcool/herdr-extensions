@@ -79,9 +79,9 @@ export default class AiUsage extends View {
   }
 
   // The status-bar row. Per account: its name; per window its label, bar with
-  // tick, percent used and, once amber or red, the time to reset; then `↺N` saved
-  // resets or reset credits, and Claude's `+$X` extra usage this month. A stale
-  // account is dimmed; an unreadable one shows "!".
+  // tick, percent used and, once amber or red, the time to reset; then Claude's
+  // `+$X` extra usage this month. A stale account is dimmed, one waiting for its
+  // first answer shows "…", an unreadable one "!".
   summary(r, now, t) {
     const segment = (w) =>
       h_flex().gap(4).items_center().flex_none()
@@ -93,8 +93,8 @@ export default class AiUsage extends View {
       const a = r[key];
       const g = h_flex().gap(8).items_center().flex_none().opacity(a.stale ? STALE : 1).child(key);
       if (a.error) return g.child(div().text_color(t.ansi1).child("!"));
+      if (a.pending) return g.child(div().child("…"));
       g.children(a.windows.map(segment));
-      if (a.resets?.left > 0) g.child(div().child(`↺${a.resets.left}`));
       if (a.extra?.used > 0) {
         const share = (100 * a.extra.used) / a.extra.cap;
         g.child(div().text_color(level(share) === "ok" ? t.dim : levelColor(level(share), t)).child(`+${money(a.extra.used, a.extra.currency)}`));
@@ -131,7 +131,9 @@ export default class AiUsage extends View {
       const a = r[key];
       const s = v_flex().gap(6).child(header(key, a));
       if (a.error) return s.child(div().text_size(11).text_color(t.ansi1).child("! Couldn't read its usage"));
-      const why = a.stale === "offline" ? "machine unreachable" : `couldn't refresh (${a.stale === "000" ? "no network" : `HTTP ${a.stale}`})`;
+      const reason = (code) => (code === "offline" ? "machine unreachable" : code === "000" ? "no network" : code === "429" ? "rate-limited (HTTP 429)" : `HTTP ${code}`);
+      if (a.pending) return s.child(small(`${reason(a.pending)}, retrying in ${until(this.due.get(activeMachine()) ?? now, now)}`));
+      const why = a.stale === "offline" ? reason(a.stale) : `couldn't refresh: ${reason(a.stale)}`;
       s.child(small(`via ${a.via === "api" ? "API" : "CLI"} · updated ${ago(a.at, now)}${a.stale ? ` · ${why}` : ""}`));
       s.child(v_flex().gap(6).opacity(a.stale ? STALE : 1).children(a.windows.map(windowLine)));
       if (a.extra) {

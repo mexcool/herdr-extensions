@@ -1,6 +1,6 @@
 # AI usage
 
-A status-bar block with how much of each Claude and Codex plan window is used, for the accounts signed in on the active space's machine. Agents on a remote machine spend that machine's accounts, so a space on it shows those. Each window gets a slim bar with a pace tick, so you can see at a glance whether you're spending faster than the clock. Badges flag saved resets and extra spend. Hovering opens a panel with reset times, extra usage, credits and links to each dashboard. It refreshes every 5 minutes.
+A status-bar block with how much of each Claude and Codex plan window is used, for the accounts signed in on the active space's machine. Agents on a remote machine spend that machine's accounts, so a space on it shows those. Each window gets a slim bar with a pace tick, so you can see at a glance whether you're spending faster than the clock. A badge flags extra spend. Hovering opens a panel with reset times, extra usage, credits and links to each dashboard. It refreshes every 5 minutes.
 
 Thanks to [nozikov/herdr-usage-limits](https://github.com/nozikov/herdr-usage-limits) (MIT) for the tick bars and the hover panel this follows, and to [steipete/CodexBar](https://github.com/steipete/CodexBar) for the way it reads the numbers.
 
@@ -11,12 +11,11 @@ Thanks to [nozikov/herdr-usage-limits](https://github.com/nozikov/herdr-usage-li
 - A 28px block on the `chrome` background with a 1px `border` line on top, sized for the right end of a status row. Its content is right-aligned with 14px side padding, text 11.8px, `dim`.
 - Per account, 14px apart: its name (`claude`, `codex`), then 8px apart:
   - per window, 4px apart: its label at 10.5px (`5h`, `7d`, or the model's name for a model-scoped weekly window, `Opus`); a 24×4px bar on a `border` track, filled to the percent used in `ansi2` (green) under 75%, `ansi3` (amber) from 75% and `ansi1` (red) from 90%, the same steps as pod-stats; on the bar a 1×8px `foreground` tick at 75% opacity, at the share of the window's time that has passed (a fill past its tick is using the window faster than the clock); the percent used, `foreground`, or amber or red with its bar; and, once amber or red, the time to reset (`2d 10h`, `38m`);
-  - `↺3` when the account has saved resets (Claude) or reset credits (Codex) available;
   - for Claude, `+$42` once extra usage this month is above zero: `dim`, amber from 75% of the monthly cap, red from 90%.
-- An account whose last reading couldn't be refreshed is drawn at 55% opacity. One with no reading shows a red `!` after its name. One that isn't on the machine (no token and no CLI) is left out. With neither account, the block is empty.
+- An account whose last reading couldn't be refreshed is drawn at 55% opacity. One whose first probe was rate-limited or had no network shows a `dim` `…` after its name until the retry. One with no reading to be had shows a red `!`. One that isn't on the machine (no token and no CLI) is left out. With neither account, the block is empty.
 - Hover, after 350ms: a panel above the block, anchored at its bottom right: 460px wide, `popover` background, 1px `border`, 8px radius, 12px padding, text 12px. Per account, with 1px `border` rules between them:
   - its name, semibold; the plan as a small `raised` badge in `accent` (`pro`, `plus`); and a `Usage dashboard ↗` link in `accent` at the right;
-  - in `dim` 11px: `via API · updated 4m ago` (or `via CLI`), plus `· couldn't refresh (HTTP 429)`, `(no network)` or `· machine unreachable` when stale;
+  - in `dim` 11px: `via API · updated 4m ago` (or `via CLI`), plus `· couldn't refresh: rate-limited (HTTP 429)`, `: no network` or `· machine unreachable` when stale. While it waits for its first answer, instead: `rate-limited (HTTP 429), retrying in 1m`;
   - a line per window: the long name (`5-hour`, `Weekly`, `Weekly · Opus`) in `muted`, a 110px bar with its tick, `59% left` in its color, and the time to reset with its local clock time (`3h 21m · 18:00`, `6d 13h · Wed 04:00`) in `dim`;
   - Claude: `Extra usage`, a bar of spend over the cap, `$42.10` in its color, `of $50 · resets Jan 1`; its hover explains that the reset date is assumed. Then `Saved resets: 1 available · next expires Jan 20`;
   - Codex: `Credits` with the balance, `unlimited` or `available`. Then `Reset credits: 2 available · next expires Jan 12`;
@@ -31,7 +30,7 @@ Thanks to [nozikov/herdr-usage-limits](https://github.com/nozikov/herdr-usage-li
 - Where the numbers come from, per account, as CodexBar does:
   1. its usage API, with the OAuth token its CLI saved;
   2. the CLI, only when there is no token or the API refuses it (401/403). The CLI owns its login, so this also refreshes an expired token, and the next probe's API call works again. It gives the windows only: no badges, extra usage or credits;
-  3. on anything else (429, 5xx, no network), or when the machine can't be reached, the last reading stays, marked stale with its age.
+  3. on anything else (429, 5xx, no network), or when the machine can't be reached, the last reading stays, marked stale with its age. With no reading yet, it waits for the retry a minute later, showing `…`.
 - It redraws once a minute, so the ticks, countdowns and ages move between probes. A probe takes about 1.5s through the APIs, about 3s through the CLIs.
 
 ## Built from
@@ -45,7 +44,7 @@ Thanks to [nozikov/herdr-usage-limits](https://github.com/nozikov/herdr-usage-li
   - Codex, CLI: `codex app-server` over stdio JSON-RPC: `initialize`, `initialized`, `account/rateLimits/read` (id 2).
   - Every token reaches curl on stdin (`-H @-`), never a command line. Nothing refreshes a token, redeems a reset or writes a credential file.
   - `parse` gives each account as null, `{ stale }`, `{ error }`, or `{ via, plan, windows, resets, extra, credits }`. Claude's windows come from the `limits` array (`kind` `session` 5h, `weekly_all` and `weekly_scoped` with `scope.model.display_name` 7d; `percent`; `resets_at`), falling back to `five_hour`/`seven_day`. Saved resets: `resets_left` summed over the `cedar_ember.grants` that aren't `paused`, have started and haven't ended, when `eligible`; the soonest `ends_at` of those with resets left. Extra usage: `extra_usage.used_credits` and `monthly_limit` over `10^decimal_places`, when `is_enabled`. Codex's windows come from `rate_limit.primary_window`/`secondary_window` (`used_percent`, `reset_at`, `limit_window_seconds`), or the CLI's `rateLimits.primary`/`secondary`. Credits: `credits` when `has_credits`. Reset credits: the `available` entries of the reset-credits list, else `rate_limit_reset_credits.available_count`.
-  - `merge` keeps the last reading as stale; `level`, `elapsed` (the tick: `1 - (resets - now) / length`, clamped), `nextMonth`, `money`, `until`, `clock`, `date` and `ago` format.
+  - `merge` keeps the last reading as stale, or marks the account `pending` when there's none; `level`, `elapsed` (the tick: `1 - (resets - now) / length`, clamped), `nextMonth`, `money`, `until`, `clock`, `date` and `ago` format.
 - `mods/ai-usage/main.js`: a `View` with `init`, `tick`, `refresh`, `summary` (the row), `details` (the panel) and `render`. The row and panel sit in a `HoverCard` from `gpui-base`: `HoverCard.new("ai-usage-panel").anchor("bottom_right").open_delay(350).close_delay(300).trigger(row).content(panel)`. It uses `exec("sh", ["-c", PROBE], { on, timeout: 60000 })` on the active space's machine, `cx.open_url`, `theme()` tokens `chrome`, `border`, `dim`, `muted`, `foreground`, `popover`, `raised`, `accent`, `hover`, `ansi2`, `ansi3`, `ansi1`, `.tooltip`, `cx.timer.every`, `cx.spawn`, `cx.notify` and `checking()`.
 - In a layout, a block at the right end of a 28px status row:
   ```json
@@ -55,7 +54,7 @@ Thanks to [nozikov/herdr-usage-limits](https://github.com/nozikov/herdr-usage-li
 
 ## Watch out
 
-- Width: 840px fits the widest the row gets: every window amber or red with a countdown, a six-letter model name, `↺N` on both accounts and `+$X`. Normal days take far less, and the content is right-aligned, but the block keeps its width, so with a narrow window the blocks to its left get squeezed. Content wider than the block is clipped at its left edge.
+- Width: 840px fits the widest the row gets: every window amber or red with a countdown, a six-letter model name and `+$X`. Normal days take far less, and the content is right-aligned, but the block keeps its width, so with a narrow window the blocks to its left get squeezed. Content wider than the block is clipped at its left edge.
 - `/api/oauth/usage`, `cedar_ember`, `get_usage` and `wham/*` are all undocumented and can change. Each is read defensively: an unexpected reply shows `!` for that account rather than wrong numbers.
 - The CLI fallback starts a full `claude` (about 0.6s and 270MB). While it runs, it is listed as a local session in Claude Code's own session list.
 - Claude doesn't say when extra usage resets. Like CodexBar, it assumes the 1st of next month at 00:00 UTC.
@@ -66,9 +65,10 @@ Thanks to [nozikov/herdr-usage-limits](https://github.com/nozikov/herdr-usage-li
 
 ## Done when
 
-- `herdr-app check mods/ai-usage` passes, and so does a scratch copy that seeds a reading (amber and red windows, badges, a stale account, an unreadable one) and draws the panel inline.
+- `herdr-app check mods/ai-usage` passes, and so does a scratch copy that seeds a reading (amber and red windows, extra spend, a stale account, a pending one, an unreadable one) and draws the panel inline.
 - On a machine with both accounts signed in, the panel says `via API` for both, and the percentages match `/usage` in Claude Code and `/status` in Codex. Each tick sits at the share of its window's time gone.
 - With the Claude token unreadable or refused, Claude says `via CLI` and still has its windows. Likewise Codex.
 - With no network, both accounts keep their last reading, dimmed, with `couldn't refresh (no network)`.
-- A window at 75% or more turns amber and shows its countdown; at 90%, red. `↺N` and `+$X` show when there are saved resets or extra spend.
+- A window at 75% or more turns amber and shows its countdown; at 90%, red. `+$X` shows once there is extra spend. Saved resets and reset credits show in the panel only.
+- A first probe that is rate-limited shows `…`, not `!`, and the panel says when it retries.
 - `Usage dashboard ↗` opens the dashboard, and `↻ Refresh` probes at once.

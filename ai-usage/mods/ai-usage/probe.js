@@ -240,8 +240,8 @@ function resetCredits(list, summary, now) {
 
 // What to show after a probe: fresh windows replace the last ones; a stale answer,
 // or no answer at all (`next` null: the machine is unreachable), keeps the last
-// reading, marked stale; an error with nothing to keep shows "!". Each account
-// keeps when it was read (`at`).
+// reading, marked stale, or with nothing to keep waits (`pending`) for the retry;
+// an error shows "!". Each account keeps when it was read (`at`).
 export function merge(prev, next, now) {
   const out = {};
   for (const key of ["claude", "codex"]) {
@@ -250,6 +250,7 @@ export function merge(prev, next, now) {
     if (!n) out[key] = null;
     else if (n.windows) out[key] = { ...n, at: now };
     else if (n.stale && p?.windows) out[key] = { ...p, stale: n.stale };
+    else if (n.stale) out[key] = { pending: n.stale };
     else out[key] = { error: true };
   }
   return out;
