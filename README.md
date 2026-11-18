@@ -8,7 +8,7 @@ Mods and layouts for the [Herdr app](https://herdr.dev), the desktop client of h
 | [`ai-usage`](ai-usage) | mod | Each Claude and Codex plan window, read on this computer, as a draining bar of what's left with a pace tick, plus extra spend, and a hover panel with reset times, saved resets, credits and dashboard links. Thanks to [nozikov/herdr-usage-limits](https://github.com/nozikov/herdr-usage-limits) for the tick bars and hover panel this follows, and [steipete/CodexBar](https://github.com/steipete/CodexBar) for the data sources |
 | [`space-status`](space-status) | mod | Herdr's `workspace-status` (machine, branch, agents) without its command-palette hint |
 | [`tab-names`](tab-names) | mod | Nothing: renames a tab to the `tab.name` label of a terminal in it, so an agent on any machine can name its tab (`hc label "$HC_TERMINAL_ID" tab.name=...`) |
-| [`main-stats`](main-stats) | layout | Herdr's `main` with `space-status`, `pod-stats` and `ai-usage` in its status bar |
+| [`main-stats`](main-stats) | layout | Herdr's `main` with `space-status`, `pod-stats` and `ai-usage` in its status bar, and `tab-names` |
 
 `pod-stats` follows the active space: switching to a space on another machine shows that machine's last numbers at once, then refreshes them. `ai-usage` shows the same reading in every space, since the accounts are the same wherever agents run. Both keep their readings in Herdr's shared state, so a reload, a layout switch or a second window shows them at once without probing again.
 
@@ -24,7 +24,7 @@ Ask the agent in your Herdr window, for one extension:
 
 > Read `~/.config/herdr-app/AGENTS.md`, then add this mod: https://github.com/mexcool/herdr-extensions/tree/main/pod-stats
 
-For the layout, which brings all three mods:
+For the layout, which brings all four mods:
 
 > Read `~/.config/herdr-app/AGENTS.md`, then add this layout: https://github.com/mexcool/herdr-extensions/tree/main/main-stats
 

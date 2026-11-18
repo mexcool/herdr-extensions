@@ -15,7 +15,7 @@ Herdr's own `main` layout, unchanged except for its status bar. The single `work
 
 ## How it behaves
 
-- As `main` does, plus the three mods: see their recipes. Only `ai-usage` reacts to the pointer: hovering it opens its panel.
+- As `main` does, plus the four mods: see their recipes. Only `ai-usage` reacts to the pointer: hovering it opens its panel.
 
 ## Built from
 
@@ -23,10 +23,11 @@ Herdr's own `main` layout, unchanged except for its status bar. The single `work
   ```json
   { "id": "status-row", "type": "row", "size": { "px": 28 }, "resizable": false, "children": [
     { "id": "status", "type": "block", "size": { "weight": 1 }, "content": { "mod": "space-status" } },
+    { "id": "tab-names", "type": "block", "size": { "px": 0 }, "content": { "mod": "tab-names" } },
     { "id": "pod-stats", "type": "block", "size": { "px": 270 }, "content": { "mod": "pod-stats", "props": { "fit": "pod-stats", "divider": true } } },
     { "id": "ai-usage", "type": "block", "size": { "px": 560 }, "content": { "mod": "ai-usage", "props": { "fit": "ai-usage" } } } ] }
   ```
-- The mods it needs are `../space-status/mods/space-status`, `../pod-stats/mods/pod-stats` and `../ai-usage/mods/ai-usage` in this repo. Copy all three into `mods/`.
+- The mods it needs are `../space-status/mods/space-status`, `../tab-names/mods/tab-names`, `../pod-stats/mods/pod-stats` and `../ai-usage/mods/ai-usage` in this repo. Copy all four into `mods/`. [Tab names](../tab-names) draws nothing: it's the 0px block that lets agents on any machine name their tab.
 
 ## Watch out
 
@@ -35,6 +36,6 @@ Herdr's own `main` layout, unchanged except for its status bar. The single `work
 
 ## Done when
 
-- `herdr-app check` passes for the three mods, and `layout.switch {"name": "main-stats"}` gives no `layout.error` in `herdr-app status`.
+- `herdr-app check` passes for the four mods, and `layout.switch {"name": "main-stats"}` gives no `layout.error` in `herdr-app status`.
 - The window looks like `main`, with space status on the left of the status bar and pod stats and AI usage at its right.
 - `ctrl-shift-l` cycles back to the previous layout.
