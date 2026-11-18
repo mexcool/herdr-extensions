@@ -262,6 +262,16 @@ export const level = (used) => (used >= 90 ? "hot" : used >= 75 ? "warn" : "ok")
 // The share of the window's time that has passed, 0..1: the pace tick.
 export const elapsed = (w, now) => Math.min(1, Math.max(0, 1 - (w.resets - now) / w.length));
 
+// What a window's tick means, in its own numbers: how much of its time has gone
+// against how much of it is used, within 5 points counting as on pace.
+export function pace(w, now) {
+  const gone = Math.round(100 * elapsed(w, now));
+  const used = Math.round(w.used);
+  const verdict = used > gone + 5 ? "faster than the clock: at this rate it runs out before it resets"
+    : used < gone - 5 ? "slower than the clock" : "about on pace";
+  return `Tick: ${gone}% of this window's time has passed. You've used ${used}%, ${verdict}.`;
+}
+
 // Claude doesn't say when extra usage resets; like CodexBar, assume the 1st of next month, 00:00 UTC.
 export function nextMonth(now) {
   const d = new Date(now);
