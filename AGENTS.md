@@ -15,7 +15,7 @@ One folder per extension, laid out like `~/.config/herdr-app`, so adding one is 
 <layout>/RECIPE.md, preview.png, layouts/<layout>.json
 ```
 
-A layout uses the mods of the sibling folders and doesn't copy them; its recipe says which to copy. The gallery lists a repo by its topic (`herdr-mod`, `herdr-layout`) and each folder by its `RECIPE.md` and `preview.png`.
+A layout uses the mods of the sibling folders and doesn't copy them; its recipe says which to copy. This repo stays off the herdr.dev gallery: don't add the `herdr-mod` or `herdr-layout` topics, which are what list a repo there.
 
 ## Mods
 
