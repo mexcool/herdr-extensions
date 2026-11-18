@@ -5,14 +5,16 @@ Mods and layouts for the [Herdr app](https://herdr.dev), the desktop client of h
 | Extension | Kind | What it shows |
 |---|---|---|
 | [`pod-stats`](pod-stats) | mod | CPU, memory and disk of the active space's machine against its own cgroup limits, so a container shows its limits rather than the node's |
-| [`ai-usage`](ai-usage) | mod | How much of each Claude and Codex plan window is left for the accounts on the active space's machine, with reset times on hover |
-| [`main-stats`](main-stats) | layout | Herdr's `main` with `ai-usage` and `pod-stats` at the right of its status bar |
+| [`ai-usage`](ai-usage) | mod | Each Claude and Codex plan window on the active space's machine as a bar with a pace tick, saved resets and extra spend, and a hover panel with reset times, credits and dashboard links. Thanks to [nozikov/herdr-usage-limits](https://github.com/nozikov/herdr-usage-limits) for the tick bars and hover panel this follows, and [steipete/CodexBar](https://github.com/steipete/CodexBar) for the data sources |
+| [`space-status`](space-status) | mod | Herdr's `workspace-status` (machine, branch, agents) without its command-palette hint |
+| [`main-stats`](main-stats) | layout | Herdr's `main` with `space-status`, `pod-stats` and `ai-usage` in its status bar |
 
-Both mods follow the active space: switching to a space on another machine shows that machine's last numbers at once, then refreshes them.
+The mods follow the active space: switching to a space on another machine shows that machine's last numbers at once, then refreshes them.
 
 **What they run.** Herdr asks you to know this before you add a mod:
 - `pod-stats` runs a small `sh` script on the active space's machine through its herdr-core. The script reads `/sys/fs/cgroup` and runs `df "$HOME"`. It makes no network calls.
-- `ai-usage` runs a `sh` script there that reads Claude Code's OAuth token (its credentials file, or the macOS Keychain) and calls `api.anthropic.com/api/oauth/usage` with `curl`. It also asks `codex app-server` for Codex's rate limits.
+- `ai-usage` reads Claude Code's and Codex's OAuth tokens (their credentials files, or Claude's macOS Keychain item) and calls `api.anthropic.com/api/oauth/usage` and `chatgpt.com/backend-api/wham/usage` and `wham/rate-limit-reset-credits` with `curl`, on that machine. Only when a token is missing or refused does it run `claude` (one `get_usage` request in safe mode, no prompt) or `codex app-server` instead. It never refreshes a token or writes a credential file.
+- `space-status` runs nothing.
 
 ## Install
 
@@ -20,7 +22,7 @@ Ask the agent in your Herdr window, for one extension:
 
 > Read `~/.config/herdr-app/AGENTS.md`, then add this mod: https://github.com/mexcool/herdr-extensions/tree/main/pod-stats
 
-For the layout, which brings both mods:
+For the layout, which brings all three mods:
 
 > Read `~/.config/herdr-app/AGENTS.md`, then add this layout: https://github.com/mexcool/herdr-extensions/tree/main/main-stats
 
@@ -32,6 +34,7 @@ cd herdr-extensions
 mkdir -p ~/.config/herdr-app/mods ~/.config/herdr-app/layouts
 ln -sfn "$PWD/pod-stats/mods/pod-stats" ~/.config/herdr-app/mods/pod-stats
 ln -sfn "$PWD/ai-usage/mods/ai-usage" ~/.config/herdr-app/mods/ai-usage
+ln -sfn "$PWD/space-status/mods/space-status" ~/.config/herdr-app/mods/space-status
 ln -sf "$PWD/main-stats/layouts/main-stats.json" ~/.config/herdr-app/layouts/main-stats.json
 herdr-app do layout.switch '{"name":"main-stats"}'
 ```

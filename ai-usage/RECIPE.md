@@ -1,52 +1,74 @@
 # AI usage
 
-A status-bar block with how much of each Claude and Codex plan window is left, for the accounts signed in on the active space's machine. Agents on a remote machine spend that machine's accounts, so a space on it shows those. It reads the same numbers as Claude Code's `/usage` and Codex's rate-limit report, and refreshes every 5 minutes.
+A status-bar block with how much of each Claude and Codex plan window is used, for the accounts signed in on the active space's machine. Agents on a remote machine spend that machine's accounts, so a space on it shows those. Each window gets a slim bar with a pace tick, so you can see at a glance whether you're spending faster than the clock. Badges flag saved resets and extra spend. Hovering opens a panel with reset times, extra usage, credits and links to each dashboard. It refreshes every 5 minutes.
+
+Thanks to [nozikov/herdr-usage-limits](https://github.com/nozikov/herdr-usage-limits) (MIT) for the tick bars and the hover panel this follows, and to [steipete/CodexBar](https://github.com/steipete/CodexBar) for the way it reads the numbers.
 
 ![AI usage](preview.png)
 
 ## What you see
 
-- A 28px block on the `chrome` background with a 1px `border` line on top, sized to sit in a status row. 440px fits Claude's three windows and Codex's two at their widest: every window at 100% and a six-letter model name take about 395px of text.
-- Right-aligned, 14px side padding, text 11.8px: `claude  5h 72%  7d 64%  Opus 80%    codex  5h 90%  7d 81%`. The account names and window labels are `dim`. Each percentage is what is left of that window (100% = unused): `foreground`, `ansi3` (amber) at 25% or less, `ansi1` (red) at 10% or less.
-- Claude's windows: `5h` (session), `7d` (weekly, all models), and a weekly window scoped to one model, labeled with the model's name, when the plan has one. Codex's: its primary and secondary windows, labeled by length (`5h`, `7d`).
-- Hovering an account shows when each window resets: `claude: % of each window left · 5h resets in 2h 10m · 7d resets in 3d 5h · …`.
-- An account that can't be read is left out. With neither, the bar is empty.
+- A 28px block on the `chrome` background with a 1px `border` line on top, sized for the right end of a status row. Its content is right-aligned with 14px side padding, text 11.8px, `dim`.
+- Per account, 14px apart: its name (`claude`, `codex`), then 8px apart:
+  - per window, 4px apart: its label at 10.5px (`5h`, `7d`, or the model's name for a model-scoped weekly window, `Opus`); a 24×4px bar on a `border` track, filled to the percent used in `ansi2` (green) under 75%, `ansi3` (amber) from 75% and `ansi1` (red) from 90%, the same steps as pod-stats; on the bar a 1×8px `foreground` tick at 75% opacity, at the share of the window's time that has passed (a fill past its tick is using the window faster than the clock); the percent used, `foreground`, or amber or red with its bar; and, once amber or red, the time to reset (`2d 10h`, `38m`);
+  - `↺3` when the account has saved resets (Claude) or reset credits (Codex) available;
+  - for Claude, `+$42` once extra usage this month is above zero: `dim`, amber from 75% of the monthly cap, red from 90%.
+- An account whose last reading couldn't be refreshed is drawn at 55% opacity. One with no reading shows a red `!` after its name. One that isn't on the machine (no token and no CLI) is left out. With neither account, the block is empty.
+- Hover, after 350ms: a panel above the block, anchored at its bottom right: 460px wide, `popover` background, 1px `border`, 8px radius, 12px padding, text 12px. Per account, with 1px `border` rules between them:
+  - its name, semibold; the plan as a small `raised` badge in `accent` (`pro`, `plus`); and a `Usage dashboard ↗` link in `accent` at the right;
+  - in `dim` 11px: `via API · updated 4m ago` (or `via CLI`), plus `· couldn't refresh (HTTP 429)`, `(no network)` or `· machine unreachable` when stale;
+  - a line per window: the long name (`5-hour`, `Weekly`, `Weekly · Opus`) in `muted`, a 110px bar with its tick, `59% left` in its color, and the time to reset with its local clock time (`3h 21m · 18:00`, `6d 13h · Wed 04:00`) in `dim`;
+  - Claude: `Extra usage`, a bar of spend over the cap, `$42.10` in its color, `of $50 · resets Jan 1`; its hover explains that the reset date is assumed. Then `Saved resets: 1 available · next expires Jan 20`;
+  - Codex: `Credits` with the balance, `unlimited` or `available`. Then `Reset credits: 2 available · next expires Jan 12`;
+  - or `! Couldn't read its usage` in red.
+- At the bottom, after a rule: `↻ Refresh` at the right, `↻ Refreshing…` in `dim` while a probe runs.
 
 ## How it behaves
 
-- Agent statuses play no part. No clicks or keys, only the hover.
-- A 1s timer checks whether the active space's machine is due: never read, or read 5 minutes ago. A failed read is retried after 1 minute. One probe at a time.
+- Agent statuses play no part. The panel opens on hover and stays open while the pointer is on it (300ms close delay), so its link and button can be clicked. `Usage dashboard ↗` opens claude.ai/settings/usage or Codex's analytics page in the browser. `↻ Refresh` probes the active machine now. There are no keys.
+- A 1s timer checks whether the active space's machine is due: never read, or read 5 minutes ago. A probe with no fresh reading is retried after 1 minute. One probe at a time.
 - The last reading of every machine is kept, so a space switch shows that machine's accounts at once. It probes again only when that machine is due, since Anthropic's endpoint throttles frequent polling.
-- A probe takes about 2 to 3 seconds; the bar keeps the previous reading until it lands.
+- Where the numbers come from, per account, as CodexBar does:
+  1. its usage API, with the OAuth token its CLI saved;
+  2. the CLI, only when there is no token or the API refuses it (401/403). The CLI owns its login, so this also refreshes an expired token, and the next probe's API call works again. It gives the windows only: no badges, extra usage or credits;
+  3. on anything else (429, 5xx, no network), or when the machine can't be reached, the last reading stays, marked stale with its age.
+- It redraws once a minute, so the ticks, countdowns and ages move between probes. A probe takes about 1.5s through the APIs, about 3s through the CLIs.
 
 ## Built from
 
 - `mods/ai-usage/mod.json`: `place: none`, title "AI usage".
-- `mods/ai-usage/probe.js`: `PROBE`, a sh script with two sections, each printed after a `--- claude` or `--- codex` line.
-  - claude: the OAuth token from `$CLAUDE_CONFIG_DIR/.credentials.json` or `~/.claude/.credentials.json`, else the macOS Keychain item `Claude Code-credentials` (`security find-generic-password -w`). Only the `accessToken` inside `claudeAiOauth` is taken: the same JSON holds one per signed-in MCP server. `GET https://api.anthropic.com/api/oauth/usage` with `Authorization: Bearer <token>` and `anthropic-beta: oauth-2025-04-20`. The headers go to curl on stdin (`-H @-`), so the token is never on a command line.
-  - codex: `codex app-server` over stdio JSON-RPC: `initialize`, `initialized`, then `account/rateLimits/read` (id 2), printing the id 2 line.
-  - `parse` reads Claude's `limits` array (`kind` `session`, `weekly_all`, `weekly_scoped` with `scope.model.display_name`; `percent` used; `resets_at`), falling back to `five_hour` and `seven_day` (`utilization`). It reads Codex's `rateLimits.primary` and `.secondary` (`usedPercent`, `windowDurationMins`, `resetsAt` in seconds). `until` formats a reset time.
-- `mods/ai-usage/main.js`: a `View` with `init`, `tick` and `render`. It uses `exec("sh", ["-c", PROBE], { on, timeout: 30000 })` on the active space's machine, `theme()` tokens `chrome`, `border`, `dim`, `foreground`, `ansi3`, `ansi1`, `.tooltip`, `cx.timer.every`, `cx.spawn`, `cx.notify` and `checking()`.
-- In a layout, a block in a 28px status row:
+- `mods/ai-usage/probe.js`, the only file that knows where the numbers come from:
+  - `PROBE`, a POSIX sh script printing a `--- claude` and a `--- codex` section, each starting with what answered (`api`, `cli`), `stale <HTTP status>` or `failed`, and empty when the machine has neither a token nor that CLI. `--- claude.plan` and `--- codex.resets` follow.
+  - Claude, API: the `accessToken` inside `claudeAiOauth`, never another `accessToken` (the JSON holds one per signed-in MCP server), from `$CLAUDE_CONFIG_DIR/.credentials.json` or `~/.claude/.credentials.json`, else the macOS Keychain item `Claude Code-credentials`. `GET https://api.anthropic.com/api/oauth/usage?cedar_ember=1` with `Authorization: Bearer …`, `anthropic-beta: oauth-2025-04-20` and `User-Agent: claude-cli/<claude --version> (external, cli)`; on 400/403, once more without `cedar_ember=1`. The plan is `claudeAiOauth.subscriptionType`.
+  - Claude, CLI: `claude -p --safe-mode --no-session-persistence --strict-mcp-config --settings '{"remoteControlAtStartup":false,"disableAllHooks":true}' --input-format stream-json --output-format stream-json --verbose`, fed one `{"type":"control_request",…,"request":{"subtype":"get_usage","skip_behaviors":true}}` from a file, read until its `control_response`, then killed. No prompt or model time, no session file, no hooks, MCP servers or Remote Control.
+  - Codex, API: `tokens.access_token` and `tokens.account_id` from `$CODEX_HOME/auth.json` (default `~/.codex`). `GET https://chatgpt.com/backend-api/wham/usage` with `Authorization: Bearer …`, `ChatGPT-Account-Id` and `User-Agent: codex-cli`. Then, best effort, `GET …/wham/rate-limit-reset-credits` for the credits' expiry.
+  - Codex, CLI: `codex app-server` over stdio JSON-RPC: `initialize`, `initialized`, `account/rateLimits/read` (id 2).
+  - Every token reaches curl on stdin (`-H @-`), never a command line. Nothing refreshes a token, redeems a reset or writes a credential file.
+  - `parse` gives each account as null, `{ stale }`, `{ error }`, or `{ via, plan, windows, resets, extra, credits }`. Claude's windows come from the `limits` array (`kind` `session` 5h, `weekly_all` and `weekly_scoped` with `scope.model.display_name` 7d; `percent`; `resets_at`), falling back to `five_hour`/`seven_day`. Saved resets: `resets_left` summed over the `cedar_ember.grants` that aren't `paused`, have started and haven't ended, when `eligible`; the soonest `ends_at` of those with resets left. Extra usage: `extra_usage.used_credits` and `monthly_limit` over `10^decimal_places`, when `is_enabled`. Codex's windows come from `rate_limit.primary_window`/`secondary_window` (`used_percent`, `reset_at`, `limit_window_seconds`), or the CLI's `rateLimits.primary`/`secondary`. Credits: `credits` when `has_credits`. Reset credits: the `available` entries of the reset-credits list, else `rate_limit_reset_credits.available_count`.
+  - `merge` keeps the last reading as stale; `level`, `elapsed` (the tick: `1 - (resets - now) / length`, clamped), `nextMonth`, `money`, `until`, `clock`, `date` and `ago` format.
+- `mods/ai-usage/main.js`: a `View` with `init`, `tick`, `refresh`, `summary` (the row), `details` (the panel) and `render`. The row and panel sit in a `HoverCard` from `gpui-base`: `HoverCard.new("ai-usage-panel").anchor("bottom_right").open_delay(350).close_delay(300).trigger(row).content(panel)`. It uses `exec("sh", ["-c", PROBE], { on, timeout: 60000 })` on the active space's machine, `cx.open_url`, `theme()` tokens `chrome`, `border`, `dim`, `muted`, `foreground`, `popover`, `raised`, `accent`, `hover`, `ansi2`, `ansi3`, `ansi1`, `.tooltip`, `cx.timer.every`, `cx.spawn`, `cx.notify` and `checking()`.
+- In a layout, a block at the right end of a 28px status row:
   ```json
-  { "id": "ai-usage", "type": "block", "size": { "px": 440 }, "content": { "mod": "ai-usage" } }
+  { "id": "ai-usage", "type": "block", "size": { "px": 840 }, "content": { "mod": "ai-usage" } }
   ```
-- It runs `sh`, `sed`, `curl`, `codex`, `mktemp`, `sleep`, `touch` and, on macOS, `security`. It reads Claude Code's credentials and reaches `api.anthropic.com`, and Codex reaches its own servers.
+- It reads Claude Code's and Codex's OAuth tokens and calls `api.anthropic.com` and `chatgpt.com`, and runs `claude` and `codex` only as the fallback. It also runs `sh`, `tr`, `sed`, `tail`, `cut`, `curl`, `mktemp`, `sleep`, `touch` and, on macOS, `security`. No icons or other files.
 
 ## Watch out
 
-- Claude's credentials JSON holds an `accessToken` for every MCP server signed in as well. Matching any `accessToken` would, depending on key order, send another service's token to `api.anthropic.com`. The match is anchored to `claudeAiOauth` and runs on the JSON with newlines removed. If that object ever gains a nested object before `accessToken`, the match finds nothing and Claude drops out, rather than picking a wrong token.
-- `/api/oauth/usage` is undocumented and may change. Its `limits` array is newer than `five_hour`/`seven_day`; both are handled.
-- It never refreshes Claude's token. A running `claude` on that machine keeps it fresh. With none for a while, the token expires and Claude drops out until one runs. Refreshing it here could race the CLI's token rotation and sign it out.
-- `codex app-server` quits at the end of its input before it answers. The probe holds the input open until the id 2 line arrives (at most 15s), and app-server then takes about 1.5s to exit.
-- `exec` with `on` runs through that machine's herdr-core, with the core's environment: `codex` and `curl` must be on the core's `PATH`.
+- Width: 840px fits the widest the row gets: every window amber or red with a countdown, a six-letter model name, `↺N` on both accounts and `+$X`. Normal days take far less, and the content is right-aligned, but the block keeps its width, so with a narrow window the blocks to its left get squeezed. Content wider than the block is clipped at its left edge.
+- `/api/oauth/usage`, `cedar_ember`, `get_usage` and `wham/*` are all undocumented and can change. Each is read defensively: an unexpected reply shows `!` for that account rather than wrong numbers.
+- The CLI fallback starts a full `claude` (about 0.6s and 270MB). While it runs, it is listed as a local session in Claude Code's own session list.
+- Claude doesn't say when extra usage resets. Like CodexBar, it assumes the 1st of next month at 00:00 UTC.
+- `codex app-server` quits at the end of its input before it answers, so the probe holds the input open until its reply arrives (at most 15s), and app-server then takes about 1.5s to exit.
+- `exec` with `on` runs through that machine's herdr-core, with the core's environment: `curl`, and `claude` and `codex` for the fallback, must be on the core's `PATH`.
 - The macOS Keychain read can raise an access prompt if the item's access list doesn't include `security`.
-- Values wider than the block spill out to the left: give it more width if a plan has more windows.
+- A `HoverCard` opens only on hover and can't be opened from a script, so `herdr-app check` doesn't draw the panel. To check it, check a scratch copy that seeds a reading while `checking()` and also draws `details(...)` inline.
 
 ## Done when
 
-- `herdr-app check mods/ai-usage` passes.
-- In a space whose machine has signed-in `claude` and `codex`, the bar shows the same percentages left as `/usage` in Claude Code and `/status` in Codex.
-- Hovering `claude` shows each window's reset time.
-- With Codex signed out on that machine, only `claude` shows. With neither, the bar is empty.
-- Switching spaces between two machines shows each one's accounts without a new probe until 5 minutes have passed.
+- `herdr-app check mods/ai-usage` passes, and so does a scratch copy that seeds a reading (amber and red windows, badges, a stale account, an unreadable one) and draws the panel inline.
+- On a machine with both accounts signed in, the panel says `via API` for both, and the percentages match `/usage` in Claude Code and `/status` in Codex. Each tick sits at the share of its window's time gone.
+- With the Claude token unreadable or refused, Claude says `via CLI` and still has its windows. Likewise Codex.
+- With no network, both accounts keep their last reading, dimmed, with `couldn't refresh (no network)`.
+- A window at 75% or more turns amber and shows its countdown; at 90%, red. `↺N` and `+$X` show when there are saved resets or extra spend.
+- `Usage dashboard ↗` opens the dashboard, and `↻ Refresh` probes at once.
