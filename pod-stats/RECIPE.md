@@ -7,10 +7,10 @@ A status-bar block with the CPU, memory and disk of the active space's machine, 
 ## What you see
 
 - A 28px block on the `chrome` background with a 1px `border` line on top, sized to sit at the right of a status row. 300px fits the widest values (two-digit cores, three-digit disk).
-- Right-aligned, 14px side padding, 16px between groups, text 11.8px: `cpu 0.7/16  mem 12.1/32G  disk 86/197G`. Each label is `dim`. Each value is `foreground`, `ansi3` (amber) from 75% of its limit, and `ansi1` (red) from 90%.
-- cpu: cores in use / cores allowed (the CPU quota, or every CPU when there's none). mem: GiB in use without page cache / the memory limit. A machine with no memory limit shows only the used figure (`mem 12.1G`). disk: GiB used / size of the filesystem holding `$HOME`.
+- Right-aligned, 14px side padding, 16px between groups, text 11.8px: `cpu 1.5/8  mem 6.2/16G  disk 40/100G`. Each label is `dim`. Each value is `foreground`, `ansi3` (amber) from 75% of its limit, and `ansi1` (red) from 90%.
+- cpu: cores in use / cores allowed (the CPU quota, or every CPU when there's none). mem: GiB in use without page cache / the memory limit. A machine with no memory limit shows only the used figure (`mem 6.2G`). disk: GiB used / size of the filesystem holding `$HOME`.
 - Nothing at all for a machine without cgroup v2 (macOS) or one that can't be reached: an empty bar, not dashes.
-- `cpu –/16` right after the first reading of a machine, for about a second.
+- `cpu –/8` right after the first reading of a machine, for about a second.
 
 ## How it behaves
 

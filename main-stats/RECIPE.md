@@ -9,8 +9,8 @@ Herdr's own `main` layout, unchanged except for its status bar. The single `work
 - Everything above the status bar is Herdr's `main` as of 0.1.16: the sidebar with spaces and agents, tabs, and the pane area with the files and changes panel.
 - The 28px status bar, left to right:
   - `workspace-status` (weight 1): the shipped block, taking the free width.
-  - `ai-usage` (360px): `claude 5h 86% 7d 85% Fable 88%  codex 7d 100%`.
-  - `pod-stats` (300px): `cpu 0.7/16 mem 12.1/32G disk 86/197G`.
+  - `ai-usage` (360px): `claude 5h 72% 7d 64% Opus 80%  codex 5h 90% 7d 81%`.
+  - `pod-stats` (300px): `cpu 1.5/8 mem 6.2/16G disk 40/100G`.
 - In a space on a machine without cgroup v2 (macOS), `pod-stats` is empty. In one without signed-in agents, `ai-usage` is empty.
 
 ## How it behaves

@@ -6,10 +6,10 @@ A status-bar block with how much of each Claude and Codex plan window is left, f
 
 ## What you see
 
-- A 28px block on the `chrome` background with a 1px `border` line on top, sized to sit in a status row. 360px fits Claude's three windows and Codex's one.
-- Right-aligned, 14px side padding, text 11.8px: `claude  5h 86%  7d 85%  Fable 88%    codex  7d 100%`. The account names and window labels are `dim`. Each percentage is what is left of that window (100% = unused): `foreground`, `ansi3` (amber) at 25% or less, `ansi1` (red) at 10% or less.
+- A 28px block on the `chrome` background with a 1px `border` line on top, sized to sit in a status row. 360px fits Claude's three windows and Codex's two.
+- Right-aligned, 14px side padding, text 11.8px: `claude  5h 72%  7d 64%  Opus 80%    codex  5h 90%  7d 81%`. The account names and window labels are `dim`. Each percentage is what is left of that window (100% = unused): `foreground`, `ansi3` (amber) at 25% or less, `ansi1` (red) at 10% or less.
 - Claude's windows: `5h` (session), `7d` (weekly, all models), and a weekly window scoped to one model, labeled with the model's name, when the plan has one. Codex's: its primary and secondary windows, labeled by length (`5h`, `7d`).
-- Hovering an account shows when each window resets: `claude: % of each window left · 5h resets in 4h 26m · 7d resets in 6d 14h · …`.
+- Hovering an account shows when each window resets: `claude: % of each window left · 5h resets in 2h 10m · 7d resets in 3d 5h · …`.
 - An account that can't be read is left out. With neither, the bar is empty.
 
 ## How it behaves
