@@ -37,7 +37,7 @@ A layout uses the mods of the sibling folders and doesn't copy them; its recipe 
      console.log(parse(execFileSync("hc", ["exec", "--", "sh", "-c", PROBE], { encoding: "utf8" })));'
    ```
 2. `herdr-app check <ext>/mods/<mod>` for each mod. It loads the mod and renders it in a hidden window. With `checking()` the bar renders empty; to cover the render path, check a scratch copy whose `init` seeds a reading while checking. Without a window (a Linux server), the Linux release tarball's `herdr-app` runs `check` with `HERDR_APP_HOME` set to a scratch folder holding a copy of the mod.
-3. Look at it in the app, with the mod linked into `~/.config/herdr-app/mods`: Herdr reloads it on save. `herdr-app shot` takes the screenshot for `preview.png`.
+3. Look at it in the app, with the mod linked into `~/.config/herdr-app/mods`. After a `git pull`, or an edit in the checkout, switch layouts away and back (`ctrl-shift-l`), or restart the app, to load the new code: Herdr doesn't see changes through the links. It only hot-reloads files saved inside `~/.config/herdr-app/mods`. `herdr-app shot` takes the screenshot for `preview.png`.
 
 Keep `RECIPE.md` in step with the code: it is the brief a fresh build is made from. Write it in the order the app's guide gives (what you see, how it behaves, built from, watch out, done when), with exact sizes, tokens and calls.
 

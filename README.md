@@ -41,6 +41,8 @@ herdr-app do layout.switch '{"name":"main-stats"}'
 
 Herdr follows the links. It saves a deliberate layout edit (docking a mod, `layout.set`) through the link into the checkout. It also writes `gpui-kit.d.ts` and `jsconfig.json` into each mod folder; `.gitignore` covers them. `ctrl-shift-l` cycles back to your previous layout.
 
+After a `git pull`, switch layouts away and back (`ctrl-shift-l`), or restart the app, to load the new code: Herdr doesn't see changes through the links.
+
 The mods have no settings. To put them in your own layout, add a block for each to a 28px status row. The recipes have the JSON.
 
 ## License
