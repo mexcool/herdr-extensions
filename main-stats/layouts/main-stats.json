@@ -193,20 +193,26 @@
               "id": "pod-stats",
               "type": "block",
               "size": {
-                "px": 300
+                "px": 270
               },
               "content": {
-                "mod": "pod-stats"
+                "mod": "pod-stats",
+                "props": {
+                  "fit": "pod-stats"
+                }
               }
             },
             {
               "id": "ai-usage",
               "type": "block",
               "size": {
-                "px": 840
+                "px": 560
               },
               "content": {
-                "mod": "ai-usage"
+                "mod": "ai-usage",
+                "props": {
+                  "fit": "ai-usage"
+                }
               }
             }
           ]

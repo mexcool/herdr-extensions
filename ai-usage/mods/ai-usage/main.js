@@ -1,6 +1,6 @@
 import { View, div } from "gpui-kit";
 import { HoverCard, h_flex, v_flex } from "gpui-base";
-import { exec, spaces, theme, checking } from "herdr";
+import { exec, spaces, theme, checking, props, run } from "herdr";
 import { PROBE, parse, merge, level, elapsed, nextMonth, money, until, clock, date, ago } from "./probe.js";
 
 // The tick bars and the hover panel follow nozikov/herdr-usage-limits (MIT); the
@@ -9,6 +9,8 @@ import { PROBE, parse, merge, level, elapsed, nextMonth, money, until, clock, da
 // Plan windows move slowly, and Anthropic's endpoint throttles frequent polling.
 const EVERY = 5 * 60 * 1000;
 const RETRY = 60 * 1000;
+// Rate-limited (HTTP 429): wait EVERY, doubling while it lasts, up to MAX_WAIT.
+const MAX_WAIT = 30 * 60 * 1000;
 const ACCOUNTS = {
   claude: { name: "Claude", dashboard: "https://claude.ai/settings/usage" },
   codex: { name: "Codex", dashboard: "https://chatgpt.com/codex/cloud/settings/analytics#usage" },
@@ -36,6 +38,7 @@ export default class AiUsage extends View {
     // machine not read for EVERY.
     this.readings = new Map();
     this.due = new Map();
+    this.wait = new Map(); // the current 429 backoff per machine
     this.busy = false;
     this.minute = 0;
     if (checking()) return;
@@ -66,8 +69,12 @@ export default class AiUsage extends View {
       const reading = merge(this.readings.get(on), next, now);
       if (reading.claude || reading.codex) this.readings.set(on, reading);
       else this.readings.delete(on);
-      const fresh = [reading.claude, reading.codex].some((p) => p?.at === now);
-      this.due.set(on, now + (fresh ? EVERY : RETRY));
+      const accounts = [reading.claude, reading.codex];
+      const limited = accounts.some((p) => p?.stale === "429" || p?.pending === "429");
+      const wait = limited ? Math.min(MAX_WAIT, (this.wait.get(on) ?? EVERY / 2) * 2) : null;
+      this.wait.set(on, wait);
+      const fresh = accounts.some((p) => p?.at === now);
+      this.due.set(on, now + (wait ?? (fresh ? EVERY : RETRY)));
       this.busy = false;
       cx.notify();
     });
@@ -164,15 +171,32 @@ export default class AiUsage extends View {
           .child(this.busy ? "↻ Refreshing…" : "↻ Refresh")));
   }
 
+  // With a `fit` prop naming this block's id in the layout, the block takes the
+  // width of what it shows: 0 when it shows nothing. A resize is window state, not
+  // a change to the layout file.
+  fit(width) {
+    const id = props()?.fit;
+    const px = Math.ceil(width);
+    if (!id || px === this.fitted) return;
+    this.fitted = px;
+    run("layout.resize", { id, px });
+  }
+
   render() {
     const t = theme();
     const now = Date.now();
-    const root = h_flex().size_full().px(14).items_center().justify_end().overflow_hidden()
+    const root = h_flex().size_full().items_center().justify_end().overflow_hidden()
       .bg(t.chrome).border_t(1).border_color(t.border).text_size(11.8).text_color(t.dim);
+    // Measured at its own width, even when the block is narrower. A 1×14px divider
+    // leads it, setting it apart from the block on its left.
+    const content = h_flex().id("ai-usage-content").flex_none().gap(14).items_center()
+      .on_size_change((size) => this.fit(size.width));
     const r = this.readings.get(activeMachine());
-    if (!r) return root;
-    return root.child(HoverCard.new("ai-usage-panel").anchor("bottom_right").open_delay(350).close_delay(300)
-      .trigger(this.summary(r, now, t))
-      .content(this.details(r, now, t)));
+    if (!r) return root.child(content);
+    return root.child(content.pr(14)
+      .child(div().w(1).h(14).bg(t.border).flex_none())
+      .child(HoverCard.new("ai-usage-panel").anchor("bottom_right").open_delay(350).close_delay(300)
+        .trigger(this.summary(r, now, t))
+        .content(this.details(r, now, t))));
   }
 }
