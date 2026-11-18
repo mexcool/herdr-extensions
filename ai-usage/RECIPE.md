@@ -23,7 +23,7 @@ A status-bar block with how much of each Claude and Codex plan window is left, f
 
 - `mods/ai-usage/mod.json`: `place: none`, title "AI usage".
 - `mods/ai-usage/probe.js`: `PROBE`, a sh script with two sections, each printed after a `--- claude` or `--- codex` line.
-  - claude: the OAuth token from `$CLAUDE_CONFIG_DIR/.credentials.json` or `~/.claude/.credentials.json`, else the macOS Keychain item `Claude Code-credentials` (`security find-generic-password -w`). `GET https://api.anthropic.com/api/oauth/usage` with `Authorization: Bearer <token>` and `anthropic-beta: oauth-2025-04-20`. The headers go to curl on stdin (`-H @-`), so the token is never on a command line.
+  - claude: the OAuth token from `$CLAUDE_CONFIG_DIR/.credentials.json` or `~/.claude/.credentials.json`, else the macOS Keychain item `Claude Code-credentials` (`security find-generic-password -w`). Only the `accessToken` inside `claudeAiOauth` is taken: the same JSON holds one per signed-in MCP server. `GET https://api.anthropic.com/api/oauth/usage` with `Authorization: Bearer <token>` and `anthropic-beta: oauth-2025-04-20`. The headers go to curl on stdin (`-H @-`), so the token is never on a command line.
   - codex: `codex app-server` over stdio JSON-RPC: `initialize`, `initialized`, then `account/rateLimits/read` (id 2), printing the id 2 line.
   - `parse` reads Claude's `limits` array (`kind` `session`, `weekly_all`, `weekly_scoped` with `scope.model.display_name`; `percent` used; `resets_at`), falling back to `five_hour` and `seven_day` (`utilization`). It reads Codex's `rateLimits.primary` and `.secondary` (`usedPercent`, `windowDurationMins`, `resetsAt` in seconds). `until` formats a reset time.
 - `mods/ai-usage/main.js`: a `View` with `init`, `tick` and `render`. It uses `exec("sh", ["-c", PROBE], { on, timeout: 30000 })` on the active space's machine, `theme()` tokens `chrome`, `border`, `dim`, `foreground`, `ansi3`, `ansi1`, `.tooltip`, `cx.timer.every`, `cx.spawn`, `cx.notify` and `checking()`.
@@ -35,6 +35,7 @@ A status-bar block with how much of each Claude and Codex plan window is left, f
 
 ## Watch out
 
+- Claude's credentials JSON holds an `accessToken` for every MCP server signed in as well. Matching any `accessToken` would, depending on key order, send another service's token to `api.anthropic.com`. The match is anchored to `claudeAiOauth` and runs on the JSON with newlines removed. If that object ever gains a nested object before `accessToken`, the match finds nothing and Claude drops out, rather than picking a wrong token.
 - `/api/oauth/usage` is undocumented and may change. Its `limits` array is newer than `five_hour`/`seven_day`; both are handled.
 - It never refreshes Claude's token. A running `claude` on that machine keeps it fresh. With none for a while, the token expires and Claude drops out until one runs. Refreshing it here could race the CLI's token rotation and sign it out.
 - `codex app-server` quits at the end of its input before it answers. The probe holds the input open until the id 2 line arrives (at most 15s), and app-server then takes about 1.5s to exit.

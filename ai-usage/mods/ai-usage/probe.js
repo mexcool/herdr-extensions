@@ -2,7 +2,8 @@
 //
 // Claude: the endpoint behind Claude Code's /usage (undocumented, may change),
 // with the CLI's own OAuth token from its credentials file, or the macOS
-// Keychain. A running claude keeps the token fresh; this never refreshes it,
+// Keychain. That JSON also holds a token per MCP server signed in, so only the
+// one inside "claudeAiOauth" is taken. A running claude keeps the token fresh; this never refreshes it,
 // so it can't race the CLI's token rotation. The token reaches curl on stdin,
 // never on a command line.
 //
@@ -17,7 +18,7 @@ creds() {
   elif command -v security >/dev/null; then security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null
   fi
 }
-token=$(creds | sed -n 's/.*"accessToken" *: *"\([^"]*\)".*/\1/p')
+token=$(creds | tr -d '\n' | sed -n 's/.*"claudeAiOauth" *: *{[^}]*"accessToken" *: *"\([^"]*\)".*/\1/p')
 echo "--- claude"
 if [ -n "$token" ]; then
   printf 'Authorization: Bearer %s\nanthropic-beta: oauth-2025-04-20\n' "$token" |
