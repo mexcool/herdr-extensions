@@ -262,14 +262,19 @@ export const level = (used) => (used >= 90 ? "hot" : used >= 75 ? "warn" : "ok")
 // The share of the window's time that has passed, 0..1: the pace tick.
 export const elapsed = (w, now) => Math.min(1, Math.max(0, 1 - (w.resets - now) / w.length));
 
-// What a window's tick means, in its own numbers: how much of its time has gone
-// against how much of it is used, within 5 points counting as on pace.
+// What a window's tick means, with CodexBar's even-consumption pace: how far use
+// is ahead of (deficit) or behind (reserve) the time gone, and in deficit when it
+// runs out at the average rate so far. No pace before 3% of the window or any use.
 export function pace(w, now) {
-  const gone = Math.round(100 * elapsed(w, now));
-  const used = Math.round(w.used);
-  const verdict = used > gone + 5 ? "faster than the clock: at this rate it runs out before it resets"
-    : used < gone - 5 ? "slower than the clock" : "about on pace";
-  return `Tick: ${gone}% of this window's time has passed. You've used ${used}%, ${verdict}.`;
+  const gone = elapsed(w, now);
+  const tick = `Tick: ${Math.round(100 * (1 - gone))}% of this window's time is left.`;
+  if (gone < 0.03 || w.used <= 0) return tick;
+  if (w.used >= 100) return `${tick} Used up until it resets.`;
+  const delta = Math.round(w.used - 100 * gone);
+  if (delta === 0) return `${tick} On pace: lasts until reset.`;
+  if (delta < 0) return `${tick} ${-delta}% in reserve: lasts until reset.`;
+  const runsOut = ((100 - w.used) * gone * w.length) / w.used;
+  return `${tick} ${delta}% in deficit: runs out in ${until(now + runsOut, now)}.`;
 }
 
 // Claude doesn't say when extra usage resets; like CodexBar, assume the 1st of next month, 00:00 UTC.

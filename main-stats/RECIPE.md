@@ -10,7 +10,7 @@ Herdr's own `main` layout, unchanged except for its status bar. The single `work
 - The 28px status bar, left to right:
   - `space-status` (weight 1): machine, branch and agent count, taking the free width.
   - `pod-stats`, as wide as its content: `cpu 1.5/8 mem 6.2/16G disk 40/100G`.
-  - a 1×14px divider, then `ai-usage`, as wide as its content: `claude 5h ▬ 41% 7d ▬ 64% Opus ▬ 80% 1d 4h  codex 5h ▬ 12% 7d ▬ 30%`.
+  - a 1×14px divider, then `ai-usage`, as wide as its content: `claude 5h ▬ 59% 7d ▬ 36% Opus ▬ 20% 1d 4h  codex 5h ▬ 88% 7d ▬ 70%`.
 - In a space on a machine without cgroup v2 (macOS), `pod-stats` is empty. In one without signed-in agents, `ai-usage` is empty.
 
 ## How it behaves
