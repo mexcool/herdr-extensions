@@ -144,6 +144,8 @@ export function parse(out, now = Date.now()) {
   if (claude?.windows) {
     const data = claude.data;
     claude.plan = section("claude.plan") || data?.response?.response?.subscription_type || null;
+    const limits = claude.via === "cli" ? data?.response?.response?.rate_limits : data;
+    claude.said = said(limits?.pace) ?? said(limits?.indicator);
     if (claude.via === "api") {
       claude.resets = savedResets(data.cedar_ember, now);
       claude.extra = extraUsage(data.extra_usage);
@@ -208,6 +210,15 @@ function codexWindows(data, via) {
     const label = mins % 1440 === 0 ? `${mins / 1440}d` : `${Math.round(mins / 60)}h`;
     return { label, name: mins === 10080 ? "Weekly" : mins === 300 ? "5-hour" : label, used, resets, length: mins * 60 * 1000 };
   });
+}
+
+// Claude's own pace, if its reply carries one: `pace` and `indicator` are there but
+// empty so far, and their shape unknown. A string, or the first text field of an
+// object, else null.
+function said(v) {
+  if (typeof v === "string" && v.trim()) return v.trim();
+  if (v && typeof v === "object") return ["message", "label", "text", "summary", "status"].map((k) => v[k]).find((x) => typeof x === "string" && x.trim()) ?? null;
+  return null;
 }
 
 // Claude's saved resets ("Reset for free" in its usage settings): the resets left in
@@ -276,18 +287,60 @@ export function countdown(w, now) {
   return w.length === 5 * HOUR || level(w.used) !== "ok" || (w.used >= 25 && deficit(w, now) > 0);
 }
 
-// What a window's tick means, with that pace, and in deficit when it runs out at
-// the average rate so far. No pace part when there's none to tell.
-export function pace(w, now) {
+// The last hour of a 5-hour window's readings, for its recent rate: per
+// "<account>:<label>", [read at, % used, resets at] from each fresh reading. A
+// window that reset (use went down, or its reset time moved) starts over. Weekly
+// windows keep none: an hour's rate stretched over days says little.
+export function record(history, reading, now) {
+  const out = {};
+  for (const key of ["claude", "codex"]) {
+    const a = reading?.[key];
+    const fresh = a?.windows && !a.stale && a.at === now;
+    for (const [k, points] of Object.entries(history ?? {})) {
+      if (k.startsWith(`${key}:`) && !fresh) out[k] = points;
+    }
+    if (!fresh) continue;
+    for (const w of a.windows.filter((w) => w.length === 5 * HOUR)) {
+      const k = `${key}:${w.label}`;
+      let points = (history?.[k] ?? []).filter(([at]) => now - at <= HOUR);
+      const last = points[points.length - 1];
+      if (last && (w.used < last[1] || Math.abs(w.resets - last[2]) > 10 * 60 * 1000)) points = [];
+      out[k] = [...points, [now, w.used, w.resets]];
+    }
+  }
+  return out;
+}
+
+// The recent rate, in % per ms, from a least-squares line through the readings:
+// only with at least 6 readings over 30 minutes or more, in which use rose by 3
+// points or more, so the whole-percent rounding of each reading can't swing it.
+// Otherwise null, and the average rate since the window started is used.
+export function recentRate(points) {
+  if (!points || points.length < 6) return null;
+  const span = points[points.length - 1][0] - points[0][0];
+  if (span < 30 * 60 * 1000) return null;
+  const mt = points.reduce((s, [at]) => s + at, 0) / points.length;
+  const mu = points.reduce((s, [, u]) => s + u, 0) / points.length;
+  const cov = points.reduce((s, [at, u]) => s + (at - mt) * (u - mu), 0);
+  const v = points.reduce((s, [at]) => s + (at - mt) ** 2, 0);
+  const slope = cov / v;
+  return slope * span >= 3 ? slope : null;
+}
+
+// What a window's tick means, with that pace, and when its use would run out:
+// at `rate` (% per ms, the recent rate) when given, else at the average rate so
+// far. No pace part when there's none to tell.
+export function pace(w, now, rate = null) {
   const gone = elapsed(w, now);
   const tick = `Tick: ${Math.round(100 * (1 - gone))}% of this window's time is left.`;
   if (gone < 0.03 || w.used <= 0) return tick;
   if (w.used >= 100) return `${tick} Used up until it resets.`;
   const delta = deficit(w, now);
-  if (delta === 0) return `${tick} On pace: lasts until reset.`;
-  if (delta < 0) return `${tick} ${-delta}% in reserve: lasts until reset.`;
-  const runsOut = ((100 - w.used) * gone * w.length) / w.used;
-  return `${tick} ${delta}% in deficit: runs out in ${until(now + runsOut, now)}.`;
+  const where = delta === 0 ? "On pace" : delta < 0 ? `${-delta}% in reserve` : `${delta}% in deficit`;
+  const runsOut = rate ? (100 - w.used) / rate : ((100 - w.used) * gone * w.length) / w.used;
+  const basis = rate ? " at the last hour's rate" : "";
+  const when = now + runsOut < w.resets ? `runs out in ${until(now + runsOut, now)}` : "lasts until reset";
+  return `${tick} ${where}: ${when}${basis}.`;
 }
 
 // Claude doesn't say when extra usage resets; like CodexBar, assume the 1st of next month, 00:00 UTC.

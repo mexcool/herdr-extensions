@@ -1,7 +1,7 @@
 import { View, div } from "gpui-kit";
 import { HoverCard, h_flex, v_flex } from "gpui-base";
 import { exec, theme, checking, props, run, shared, setShared } from "herdr";
-import { PROBE, parse, merge, level, elapsed, pace, countdown, nextMonth, money, until, clock, date, ago } from "./probe.js";
+import { PROBE, parse, merge, record, recentRate, level, elapsed, pace, countdown, nextMonth, money, until, clock, date, ago } from "./probe.js";
 
 // The tick bars and the hover panel follow nozikov/herdr-usage-limits (MIT); the
 // data sources follow steipete/CodexBar.
@@ -84,6 +84,7 @@ export default class AiUsage extends View {
         due: done + (wait ?? (fresh ? EVERY : RETRY)),
         wait,
         probing: 0,
+        history: record(last.history, reading, done),
       });
     });
   }
@@ -136,7 +137,7 @@ export default class AiUsage extends View {
       line(w.name, windowBar(110, w, now, t),
         div().text_color(tinted(w.used, t)).child(`${Math.round(100 - w.used)}% left`),
         `${until(w.resets, now)} · ${clock(w.resets, now)}`)
-        .id(`ai-usage-${key}-${w.label}`).tooltip(pace(w, now));
+        .id(`ai-usage-${key}-${w.label}`).tooltip(pace(w, now, recentRate(state().history?.[`${key}:${w.label}`])));
     const header = (key, a) =>
       h_flex().gap(6).items_center()
         .child(div().flex_none().font_semibold().child(ACCOUNTS[key].name))
@@ -152,6 +153,7 @@ export default class AiUsage extends View {
       if (a.pending) return s.child(small(`${reason(a.pending)}, retrying in ${until(state().due ?? now, now)}`));
       const why = a.stale === "offline" ? reason(a.stale) : `couldn't refresh: ${reason(a.stale)}`;
       s.child(small(`via ${a.via === "api" ? "API" : "CLI"} · updated ${ago(a.at, now)}${a.stale ? ` · ${why}` : ""}`));
+      if (a.said) s.child(small(`${ACCOUNTS[key].name}'s pace: ${a.said}`));
       s.child(v_flex().gap(6).opacity(a.stale ? STALE : 1).children(a.windows.map(windowLine(key))));
       if (a.extra) {
         const share = (100 * a.extra.used) / a.extra.cap;
