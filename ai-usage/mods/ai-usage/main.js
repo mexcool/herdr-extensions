@@ -1,7 +1,7 @@
 import { View, div } from "gpui-kit";
 import { HoverCard, h_flex, v_flex } from "gpui-base";
 import { exec, theme, checking, props, run, shared, setShared } from "herdr";
-import { PROBE, parse, merge, record, recentRate, level, elapsed, pace, countdown, nextMonth, money, until, clock, date, ago } from "./probe.js";
+import { PROBE, parse, merge, record, recentRate, level, elapsed, deficit, pace, countdown, nextMonth, money, until, clock, date, ago } from "./probe.js";
 
 // The tick bars and the hover panel follow nozikov/herdr-usage-limits (MIT); the
 // data sources follow steipete/CodexBar.
@@ -19,18 +19,23 @@ const STALE = 0.55;
 
 const levelColor = (lv, t) => (lv === "hot" ? t.ansi1 : lv === "warn" ? t.ansi3 : t.ansi2);
 
-// A 4px track filled to `fill` percent in the color of `used`, with a 1×8px tick
+// A 4px track filled to `fill` percent in the color of `severity`, with a 1×8px tick
 // at `tick` (0..1) when given.
-function bar(width, fill, used, tick, t) {
+function bar(width, fill, severity, tick, t) {
   return div().relative().w(width).h(4).rounded(2).bg(t.border).flex_none()
-    .child(div().absolute().left(0).top(0).h(4).rounded(2).w(Math.round((width * Math.min(100, Math.max(0, fill))) / 100)).bg(levelColor(level(used), t)))
+    .child(div().absolute().left(0).top(0).h(4).rounded(2).w(Math.round((width * Math.min(100, Math.max(0, fill))) / 100)).bg(levelColor(severity, t)))
     .when(tick !== null, (b) => b.child(div().absolute().top(-2).left(Math.round(width * tick)).w(1).h(8).bg(t.foreground).opacity(0.75)));
 }
 
 // A window as CodexBar draws it: the fill is what's left, draining, and the tick
 // the share of its time left, so a fill short of its tick is using the window
 // faster than the clock.
-const windowBar = (width, w, now, t) => bar(width, 100 - w.used, w.used, 1 - elapsed(w, now), t);
+function windowBar(width, w, now, t) {
+  const quota = level(w.used);
+  const behind = deficit(w, now);
+  const severity = quota === "hot" || behind > 15 ? "hot" : behind >= 10 ? "warn" : quota;
+  return bar(width, 100 - w.used, severity, 1 - elapsed(w, now), t);
+}
 
 const tinted = (used, t) => (level(used) === "ok" ? t.foreground : levelColor(level(used), t));
 
@@ -157,7 +162,7 @@ export default class AiUsage extends View {
       s.child(v_flex().gap(6).opacity(a.stale ? STALE : 1).children(a.windows.map(windowLine(key))));
       if (a.extra) {
         const share = (100 * a.extra.used) / a.extra.cap;
-        s.child(line("Extra usage", bar(110, share, share, null, t),
+        s.child(line("Extra usage", bar(110, share, level(share), null, t),
           div().text_color(tinted(share, t)).child(`${money(a.extra.used, a.extra.currency, true)}`),
           `of ${money(a.extra.cap, a.extra.currency)} · resets ${date(nextMonth(now))}`)
           .id("ai-usage-extra").tooltip("Extra usage this month. Claude doesn't say when it resets: assumed the 1st, 00:00 UTC."));
