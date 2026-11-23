@@ -5,9 +5,12 @@ import { terminals, panes, spaces, machines, run, shared, setShared, checking } 
 // tab.name=<name> (`hc label <terminal> tab.name=<name>`) gets its tab renamed
 // to <name>. A tab no label names takes the title of its first agent pane: for
 // Claude Code its session name (`-n`, `/rename`). Once per value, so a rename made
-// later in the app stays.
+// later in the app stays. A pane.name label names the pane showing that terminal
+// the same way (Herdr 0.1.17's pane.rename).
 const LABEL = "tab.name";
 const KEY = "tab-names"; // shared: { <terminal address>: <name it was given> }
+const PANE_LABEL = "pane.name";
+const PANE_KEY = "tab-names.panes"; // shared: { <terminal address>: <pane name it was given> }
 
 const machineOf = (address) => (address.includes("/") ? address.split("/")[0] : "");
 
@@ -41,7 +44,22 @@ export default class TabNames extends View {
     // (offline), so their labels don't rename again when they come back.
     const ready = new Set(machines().filter((m) => m.layout === "ready").map((m) => m.name ?? ""));
     const live = new Set(terminals().map((t) => t.address));
-    const next = Object.fromEntries(Object.entries(given).filter(([a]) => live.has(a) || !ready.has(machineOf(a))));
+    const kept = (map) => Object.fromEntries(Object.entries(map).filter(([a]) => live.has(a) || !ready.has(machineOf(a))));
+    const next = kept(given);
+    const givenPanes = shared(PANE_KEY) ?? {};
+    const nextPanes = kept(givenPanes);
+    const paneOf = new Map(shown.map((p) => [p.terminal, p.pane]));
+    for (const t of terminals()) {
+      const name = t.labels?.[PANE_LABEL];
+      if (!name) continue;
+      if (givenPanes[t.address] !== name) {
+        const pane = paneOf.get(t.address);
+        if (!pane) continue; // no pane yet: try again on the next tick
+        run("pane.rename", { pane, name });
+      }
+      nextPanes[t.address] = name;
+    }
+    if (JSON.stringify(nextPanes) !== JSON.stringify(givenPanes)) setShared(PANE_KEY, nextPanes);
     const labelled = new Set(); // tabs a label names
     for (const t of terminals()) {
       const name = t.labels?.[LABEL];
